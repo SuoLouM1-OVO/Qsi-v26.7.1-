@@ -54,7 +54,6 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
     { name: '平面视觉设计', category: '核心业务' },
     { name: '书籍装帧', category: '出版物' },
     { name: '包装结构', category: '工程包装' },
-    { name: 'C4D', category: '三维动效' },
     { name: 'UI设计', category: '数字界面' },
     { name: '展陈视觉', category: '空间艺术' },
     { name: '动态视觉', category: '动效' }

@@ -5,14 +5,14 @@ export const PROJECTS: Project[] = [
     id: 'photo-exhibition',
     cardNumber: 'A♠',
     suit: 'spade',
-    title: '關於麻賽的攝影展 主視覺',
+    title: 'QSI展 主視覺',
     subtitle: 'a PHOTOGRAPHIC EXHIBITION',
     category: 'exhibition',
     categoryLabel: 'EXHIBITION / ART',
     year: '2026',
     index: '01/16',
     client: 'Masai Photography Art Foundation',
-    coverImage: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://i.pinimg.com/736x/78/cb/4d/78cb4ddb73065348eb902584821acd94.jpg',
     galleryImages: [
       'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80',
@@ -26,7 +26,7 @@ export const PROJECTS: Project[] = [
     tags: ['主视觉设计', '展陈排版', '黑白摄影', '海报设计'],
     colorPalette: ['#121212', '#2A2A2A', '#8C8C8C', '#EAEAEA', '#FFFFFF'],
     featured: true,
-    likes: 1280
+    likes:12
   },
   {
     id: 'tiger-ceramic',
@@ -53,7 +53,7 @@ export const PROJECTS: Project[] = [
     tags: ['书籍装帧', '排版艺术', '特种纸', '陶瓷文化'],
     colorPalette: ['#3A322C', '#6E5D4F', '#A39382', '#D1C8BD', '#F7F4EF'],
     featured: true,
-    likes: 1150
+    likes: 0
   },
   {
     id: 'lin-fengmian-grad',
@@ -79,7 +79,7 @@ export const PROJECTS: Project[] = [
     tags: ['毕业展主视觉', '导视系统', '动态海报', '视觉传达'],
     colorPalette: ['#3B82F6', '#EC4899', '#10B981', '#F59E0B', '#0F172A'],
     featured: true,
-    likes: 980
+    likes: 90
   },
   {
     id: 'power-herbal-tea',
@@ -157,7 +157,7 @@ export const PROJECTS: Project[] = [
     tags: ['精品咖啡', '包装设计', '印花图案', '实验室风格'],
     colorPalette: ['#222222', '#555555', '#999999', '#DDDDDD', '#F8F8F8'],
     featured: true,
-    likes: 760
+    likes: 76
   },
   {
     id: 'cny-2025-card',
@@ -332,15 +332,15 @@ export const PROJECTS: Project[] = [
 ];
 
 export const ABOUT_DATA = {
-  name: '齐思 QSi',
+  name: '齐传',
   englishName: 'QSi DESIGN',
-  title: '平面设计师 / 艺术指导 / 品牌视觉总监',
+  title: '平面设计师 / 插画设计 / 品牌视觉设计师',
   englishTitle: 'Graphic Designer & Art Director',
-  location: 'Shanghai / Hangzhou / Remote',
-  email: 'qsi.design@gmail.com',
-  phone: '+86 188 8888 8888',
-  wechat: 'QSi_Studio',
-  qq: '120923',
+  location: '  Hangzhou / Remote',
+  email: '2691726671@qq.com',
+  phone: '+86 13194509273',
+  wechat: 'qq120923_',
+  qq: '2691726671',
   social: {
     xiaohongshu: '齐思QSi (小红书)',
     behance: 'behance.net/qsi-design',
