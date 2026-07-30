@@ -76,9 +76,14 @@ export const WorksTab: React.FC<WorksTabProps> = ({
     { id: 'exhibition', labelEn: 'EXHIBITION', labelZh: '展陈艺术', count: projects.filter((p) => p.category === 'exhibition').length }
   ];
 
-  const filteredProjects = selectedCategory === 'all'
+  const filteredProjects = (selectedCategory === 'all'
     ? projects
-    : projects.filter((p) => p.category === selectedCategory);
+    : projects.filter((p) => p.category === selectedCategory)
+  ).slice().sort((a, b) => {
+    const likesA = likesMap[a.id] ?? (a.likes || 0);
+    const likesB = likesMap[b.id] ?? (b.likes || 0);
+    return likesB - likesA;
+  });
 
   const nextDeckCard = () => {
     playClickSound();

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { QSiLogo } from './QSiLogo';
 
 interface IntroLoaderProps {
   onStartExit?: () => void;
@@ -90,11 +91,8 @@ export const IntroLoader: React.FC<IntroLoaderProps> = ({ onStartExit, onComplet
               : 'opacity-0 translate-x-6 scale-98'
           }`}
         >
-          <div className="relative group flex items-baseline">
-            <span className="text-5xl sm:text-6xl md:text-7xl font-light font-sans tracking-tight text-neutral-800 dark:text-neutral-100 animate-[pulse_4s_infinite_ease-in-out] trae-browser-inspect-draggable">
-              QSi
-            </span>
-            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-neutral-800 dark:bg-neutral-200 animate-ping opacity-75 inline-block mb-1 ml-1" />
+          <div className="relative group flex items-center gap-3">
+            <QSiLogo className="h-12 sm:h-16 md:h-20 w-auto text-neutral-800 dark:text-neutral-100" pulsingLine />
           </div>
         </div>
       </div>
@@ -105,9 +103,7 @@ export const IntroLoader: React.FC<IntroLoaderProps> = ({ onStartExit, onComplet
         <div className="min-h-[48px] flex items-center">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-light font-sans tracking-normal text-neutral-800 dark:text-neutral-100 flex items-center">
             <span>{typedText}</span>
-            {typedText.length < fullText.length && (
-              <span className="inline-block w-[1.5px] h-6 sm:h-8 ml-1 bg-neutral-600 dark:bg-neutral-300 animate-pulse" />
-            )}
+            <span className="inline-block w-[2.5px] h-6 sm:h-8 ml-1.5 bg-black dark:bg-white animate-[pulse_0.5s_ease-in-out_infinite]" />
           </h1>
         </div>
 
@@ -119,7 +115,7 @@ export const IntroLoader: React.FC<IntroLoaderProps> = ({ onStartExit, onComplet
               : 'opacity-0 translate-y-2'
           }`}
         >
-          <p className="text-xs sm:text-sm font-sans font-extralight tracking-[0.2em] text-neutral-400 dark:text-neutral-500 animate-[pulse_4s_infinite_ease-in-out]">
+          <p className="text-xs sm:text-sm font-sans font-extralight tracking-[0.2em] text-neutral-400 dark:text-neutral-500">
             {subtitleText}
           </p>
         </div>

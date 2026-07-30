@@ -10,7 +10,6 @@ import { HomeTab } from './components/HomeTab';
 import { AboutTab } from './components/AboutTab';
 import { WorksTab } from './components/WorksTab';
 import { ProjectModal } from './components/ProjectModal';
-import { SearchModal } from './components/SearchModal';
 import { CustomCursor } from './components/CustomCursor';
 import { IntroLoader } from './components/IntroLoader';
 import { PROJECTS } from './data/portfolioData';
@@ -57,8 +56,8 @@ export default function App() {
   }, [darkMode]);
 
   // Global Likes State Management (+1 increment only, capped at 999+)
-  const [likesMap, setLikesMap] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('qsi_likes_map');
+  const [userLikeDeltas, setUserLikeDeltas] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('qsi_user_like_deltas');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -66,22 +65,28 @@ export default function App() {
         // ignore parse error
       }
     }
-    const initialMap: Record<string, number> = {};
-    PROJECTS.forEach((p) => {
-      initialMap[p.id] = p.likes || 12;
-    });
-    return initialMap;
+    return {};
   });
 
+  // Calculate current effective likes map
+  const likesMap = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    PROJECTS.forEach((p) => {
+      const base = typeof p.likes === 'number' ? p.likes : 12;
+      const delta = userLikeDeltas[p.id] || 0;
+      map[p.id] = base + delta;
+    });
+    return map;
+  }, [userLikeDeltas]);
+
   const handleIncrementLike = (projectId: string) => {
-    setLikesMap((prevLikes) => {
-      const currentCount = prevLikes[projectId] ?? 12;
+    setUserLikeDeltas((prev) => {
       const updated = {
-        ...prevLikes,
-        [projectId]: currentCount + 1
+        ...prev,
+        [projectId]: (prev[projectId] || 0) + 1
       };
       try {
-        localStorage.setItem('qsi_likes_map', JSON.stringify(updated));
+        localStorage.setItem('qsi_user_like_deltas', JSON.stringify(updated));
       } catch (e) {
         // ignore storage error
       }
@@ -161,15 +166,21 @@ export default function App() {
       <Header
         activeTab={activeTab}
         setActiveTab={handleTabClick}
+        isSearchOpen={searchOpen}
         onOpenSearch={() => {
           playClickSound();
-          setSearchOpen(true);
+          setSearchOpen(!searchOpen);
         }}
         projectCount={PROJECTS.length}
         language={language}
         setLanguage={setLanguage}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
+        projects={PROJECTS}
+        onSelectProject={(project) => {
+          setSelectedProject(project);
+          playClickSound();
+        }}
       />
 
       {/* CONTINUOUS SCROLLABLE MAIN CONTENT */}
@@ -226,18 +237,6 @@ export default function App() {
         playClickSound={playClickSound}
         likesMap={likesMap}
         onIncrementLike={handleIncrementLike}
-      />
-
-      {/* GLOBAL SEARCH OVERLAY */}
-      <SearchModal
-        isOpen={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        projects={PROJECTS}
-        onSelectProject={(project) => {
-          playClickSound();
-          setSelectedProject(project);
-        }}
-        playClickSound={playClickSound}
       />
 
       {/* INITIALIZATION INTRO LOADER */}

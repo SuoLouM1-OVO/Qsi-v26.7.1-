@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Phone, MessageSquare, QrCode, X, ArrowUpRight, Sparkles, ExternalLink } from 'lucide-react';
 import { ABOUT_DATA } from '../data/portfolioData';
 import { TabType, Language } from '../types';
+import { QSiLogo } from './QSiLogo';
 
 interface FooterBarProps {
   activeTab: TabType;
@@ -156,7 +157,9 @@ export const FooterBar: React.FC<FooterBarProps> = ({
             }`}
             id="footer-bottom-left-profile-btn"
           >
-            <span className="text-xl font-light font-sans tracking-tight text-neutral-800 dark:text-neutral-100 animate-[pulse_4s_infinite_ease-in-out]">QSi</span>
+            <div className="w-6 h-6 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center p-1">
+              <QSiLogo variant="icon" className="w-4 h-4 text-white dark:text-black" />
+            </div>
             <span className="text-xs font-bold font-mono tracking-tight text-black dark:text-white hidden sm:inline">
               QSi DESIGN
             </span>

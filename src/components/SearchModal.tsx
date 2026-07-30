@@ -35,13 +35,41 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center pt-20 px-4">
-        
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-end pt-14 pr-4 sm:pr-8 pl-4"
+      >
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="bg-white dark:bg-neutral-900 w-full max-w-2xl border border-black dark:border-neutral-700 shadow-2xl overflow-hidden transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          initial={{
+            opacity: 0,
+            scale: 0.15,
+            x: 40,
+            y: -20,
+            borderRadius: '28px'
+          }}
+          animate={{
+            opacity: 1,
+            scale: 1,
+            x: 0,
+            y: 0,
+            borderRadius: '24px'
+          }}
+          exit={{
+            opacity: 0,
+            scale: 0.15,
+            x: 40,
+            y: -20,
+            borderRadius: '28px'
+          }}
+          transition={{
+            type: 'spring',
+            stiffness: 420,
+            damping: 28,
+            mass: 0.8
+          }}
+          style={{ transformOrigin: 'top right' }}
+          className="bg-white dark:bg-neutral-900 w-full max-w-xl border border-black dark:border-neutral-700 shadow-2xl overflow-hidden transition-colors rounded-2xl"
         >
           {/* SEARCH INPUT */}
           <div className="p-4 border-b border-gray-100 dark:border-neutral-800 flex items-center gap-3">
@@ -64,7 +92,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             )}
             <button
               onClick={onClose}
-              className="px-3 py-1 bg-black dark:bg-white text-white dark:text-black text-[10px] font-mono uppercase tracking-widest"
+              className="px-3 py-1 bg-black dark:bg-white text-white dark:text-black text-[10px] font-mono uppercase tracking-widest rounded-full"
             >
               关闭 ESC
             </button>
@@ -84,9 +112,9 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                   onSelectProject(project);
                   onClose();
                 }}
-                className="flex items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-neutral-800/60 cursor-pointer transition-colors group"
+                className="flex items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-neutral-800/60 cursor-pointer transition-colors group rounded-xl"
               >
-                <div className="w-12 h-12 overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-100 dark:border-neutral-800 shrink-0">
+                <div className="w-12 h-12 overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-100 dark:border-neutral-800 shrink-0 rounded-lg">
                   <img
                     src={project.coverImage}
                     alt={project.title}
@@ -97,9 +125,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono font-bold bg-black dark:bg-white text-white dark:text-black px-1.5 py-0.5">
-                      {project.cardNumber}
-                    </span>
                     <span className="text-xs font-bold text-black dark:text-white truncate font-sans">{project.title}</span>
                   </div>
                   <p className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 truncate uppercase tracking-wider mt-0.5">

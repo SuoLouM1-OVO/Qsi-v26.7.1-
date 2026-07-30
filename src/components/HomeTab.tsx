@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Dices, Shuffle, ArrowRight, Eye, RefreshCw, Sparkles, Folder, Mail } from 'lucide-react';
 import { FLOATING_ITEMS, PROJECTS } from '../data/portfolioData';
 import { Project, FloatingItem, Language } from '../types';
+import { QSiLogo } from './QSiLogo';
 
 // Realistic 3D Cubic Dice Component with Specular Lighting & Smooth Rounded Edges
 const Realistic3DDice: React.FC<{ isRolling?: boolean; className?: string }> = ({ isRolling, className = "w-10 h-10" }) => {
@@ -76,16 +77,14 @@ const TEN_PERIMETER_SLOTS = [
 ];
 
 const createTop10Items = (likesMap: Record<string, number> = {}): FloatingItem[] => {
-  // Sort projects: featured projects first, then sorted by likes descending
+  // Sort projects: highest likes descending
   const sorted = [...PROJECTS].sort((a, b) => {
-    const isFeaturedA = a.featured !== false ? 1 : 0;
-    const isFeaturedB = b.featured !== false ? 1 : 0;
-    if (isFeaturedA !== isFeaturedB) {
-      return isFeaturedB - isFeaturedA;
-    }
     const likesA = likesMap[a.id] ?? a.likes ?? 0;
     const likesB = likesMap[b.id] ?? b.likes ?? 0;
-    return likesB - likesA;
+    if (likesB !== likesA) {
+      return likesB - likesA;
+    }
+    return (b.featured !== false ? 1 : 0) - (a.featured !== false ? 1 : 0);
   });
 
   const top10 = sorted.slice(0, 10);
@@ -118,6 +117,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 }) => {
   const [items, setItems] = useState<FloatingItem[]>(() => createTop10Items(likesMap));
   const [isRandomized, setIsRandomized] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkTouch = () => {
+      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches);
+    };
+    checkTouch();
+    window.addEventListener('resize', checkTouch);
+    return () => window.removeEventListener('resize', checkTouch);
+  }, []);
 
   // Sync top 10 items if likesMap updates and user hasn't shuffled to random draw mode
   useEffect(() => {
@@ -156,6 +165,24 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     }
   };
 
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!canvasRef.current || e.touches.length === 0) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    lastPosRef.current = { x, y };
+
+    if (!rafIdRef.current) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        if (lastPosRef.current) {
+          setMousePos(lastPosRef.current);
+        }
+        rafIdRef.current = null;
+      });
+    }
+  };
 
   const handleMouseLeave = () => {
     if (rafIdRef.current) {
@@ -166,14 +193,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     setHoveredItemId(null);
   };
 
-  // Bring item to front on drag/hover by reordering array without unbounded zIndex growth
+  // Bring item to front on drag/hover by updating zIndex directly without array reordering re-mounts
   const bringToFront = (id: string) => {
-    setItems((prev) => {
-      const idx = prev.findIndex((item) => item.id === id);
-      if (idx === -1 || idx === prev.length - 1) return prev;
-      const target = prev[idx];
-      const rest = prev.filter((item) => item.id !== id);
-      return [...rest, target];
+    setActiveZ((prevZ) => {
+      const nextZ = prevZ + 1;
+      setItems((prevItems) =>
+        prevItems.map((item) =>
+          item.id === id ? { ...item, zIndex: nextZ } : item
+        )
+      );
+      return nextZ;
     });
   };
 
@@ -253,12 +282,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       {/* Subtle Ambient Lighting Depth */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[700px] h-[300px] bg-gradient-to-r from-gray-100/50 via-neutral-100/40 to-gray-50/50 dark:from-neutral-900/40 dark:via-neutral-800/20 dark:to-neutral-900/40 blur-3xl pointer-events-none rounded-full" />
 
-      {/* FLOATING CANVAS AREA (Border-free full viewport floating area) */}
+      {/* FLOATING CANVAS AREA (Border-free full viewport floating area with touch-pan-y support for mobile scrolling) */}
       <div 
         ref={canvasRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative flex-1 w-full h-full flex items-center justify-center overflow-visible touch-none px-2 sm:px-6"
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleMouseLeave}
+        className="relative flex-1 w-full h-full flex items-center justify-center overflow-visible touch-pan-y px-2 sm:px-6"
       >
         
         {/* CENTER TYPOGRAPHY (Strict z-30 layer ensures buttons & text are ALWAYS on top of floating cards) */}
@@ -269,19 +300,19 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
             className="space-y-3 sm:space-y-6"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 bg-black dark:bg-white text-white dark:text-black text-[9px] sm:text-[10px] font-mono tracking-widest uppercase shadow-xs rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-black animate-pulse" />
-              <span>{language === 'zh' ? '齐思设计 • QSi DESIGN' : 'QSi DESIGN STUDIO'}</span>
+            {/* BRAND LOGO DISPLAY */}
+            <div className="flex justify-center mb-2">
+              <QSiLogo className="h-10 sm:h-14 md:h-16 w-auto text-black dark:text-white" />
             </div>
 
             {/* FLUID HEADING TEXT */}
-            <h1 className="text-[clamp(1.5rem,4.2vw,3.75rem)] font-black tracking-tight text-black dark:text-white font-sans leading-[1.12]">
-              {language === 'zh' ? '美学重构与视觉实践' : 'RESTRUCTURING & VISUAL PRACTICE'}
+            <h1 className="text-[clamp(1.2rem,2.5vw,2.2rem)] font-light sm:font-normal tracking-tight text-black dark:text-white font-sans leading-[1.25]">
+              {language === 'zh' ? '奇思妙想&创造无限可能' : 'CREATE UNLIMITED POSSIBILITIES'}
             </h1>
 
             <p className="text-[11px] sm:text-sm text-gray-600 dark:text-neutral-400 max-w-md sm:max-w-lg mx-auto font-sans leading-relaxed font-light">
               {language === 'zh'
-                ? '以极简致纯粹，于留白处见天地。拖拽或探索四周的灵感卡片，探索品牌的视觉资产与设计探索。'
+                ? '思想相逢，妙想生长；设计是想象力的容器，让一切看不见的憧憬，拥有清晰而动人的模样。'
                 : 'Purity through minimalism. Drag or interact with floating inspiration cards around the perimeter.'}
             </p>
 
@@ -328,7 +359,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
               let repelX = 0;
               let repelY = 0;
-              let repelScaleOffset = 0;
 
               if (!isSelectedCard) {
                 const itemPx = (item.x / 100) * width;
@@ -337,23 +367,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 let calcX = itemPx;
                 let calcY = itemPy;
 
-                // 1. Mouse Repulsion Force (Highly sensitive exponential curve)
-                if (mousePos) {
-                  const dxMouse = itemPx - mousePos.x;
-                  const dyMouse = itemPy - mousePos.y;
-                  const distMouse = Math.hypot(dxMouse, dyMouse);
-
-                  const repelRadius = Math.max(300, Math.min(width, height) * 0.46);
-
-                  if (distMouse < repelRadius && distMouse > 0) {
-                    const factor = Math.pow(1 - distMouse / repelRadius, 1.1) * 260;
-                    calcX += (dxMouse / distMouse) * factor;
-                    calcY += (dyMouse / distMouse) * factor;
-                    repelScaleOffset = -0.05 * (1 - distMouse / repelRadius);
-                  }
-                }
-
-                // 2. Central Protection Shield (strictly prevents covering center text & buttons)
+                // Central Protection Shield (strictly prevents covering center text & buttons)
                 const centerX = width / 2;
                 const centerY = height / 2;
 
@@ -378,9 +392,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
               const targetY = isSelectedCard ? -16 : repelY;
 
+              // Ensure touched/hovered card zooms up smoothly without repulsion jitter
               const currentScale = isSelectedCard
                 ? item.scale * 1.25
-                : item.scale + repelScaleOffset;
+                : item.scale;
 
               const cardTitle = matchedProject
                 ? (language === 'zh' ? matchedProject.title : matchedProject.subtitle)
@@ -393,7 +408,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               return (
                 <motion.div
                   key={item.id}
-                  drag
+                  drag={!isTouchDevice}
                   dragMomentum={true}
                   dragElastic={0.15}
                   onDragStart={() => {
@@ -401,17 +416,28 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     bringToFront(item.id);
                   }}
                   onDragEnd={() => setDraggedItemId(null)}
-                  onClick={() => bringToFront(item.id)}
-                  onMouseEnter={() => {
-                    setHoveredItemId(item.id);
+                  onTap={() => {
                     bringToFront(item.id);
+                    if (matchedProject) {
+                      onSelectProject(matchedProject);
+                    }
                   }}
-                  onMouseLeave={() => setHoveredItemId(null)}
+                  onMouseEnter={() => {
+                    if (!isTouchDevice) {
+                      setHoveredItemId(item.id);
+                      bringToFront(item.id);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (!isTouchDevice) {
+                      setHoveredItemId(null);
+                    }
+                  }}
                   initial={{
-                    left: '50%',
-                    top: '50%',
+                    left: `${item.x}%`,
+                    top: `${item.y}%`,
                     opacity: 0,
-                    scale: 0.1
+                    scale: 0.3
                   }}
                   animate={
                     isIntroReady
@@ -425,29 +451,28 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                           rotate: isSelectedCard ? 0 : item.rotation
                         }
                       : {
-                          left: '50%',
-                          top: '50%',
+                          left: `${item.x}%`,
+                          top: `${item.y}%`,
                           x: 0,
                           y: 0,
                           opacity: 0,
-                          scale: 0.1,
+                          scale: 0.3,
                           rotate: 0
                         }
                   }
                   transition={{
                     type: 'spring',
-                    stiffness: 220,
-                    damping: 22,
-                    mass: 0.65,
-                    delay: isIntroReady ? (index % 8) * 0.05 + 0.1 : 0
+                    stiffness: 280,
+                    damping: 24,
+                    mass: 0.6,
+                    delay: isIntroReady ? (index % 8) * 0.04 : 0
                   }}
-                  style={{ zIndex: isSelectedCard ? 20 : index + 1 }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing pointer-events-auto transition-all duration-200 transform-gpu will-change-transform"
+                  style={{ zIndex: isSelectedCard ? 60 : item.zIndex }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer touch-manipulation pointer-events-auto transition-all duration-200 transform-gpu will-change-transform"
                 >
               {(item.type === 'card' || item.type === 'sketch' || item.type === 'photo') && (
                 <div
-                  onClick={() => matchedProject && onSelectProject(matchedProject)}
-                  className={`group relative bg-white dark:bg-neutral-900 p-3 sm:p-3.5 rounded-2xl border transition-all duration-300 w-[200px] sm:w-[250px] md:w-[280px] ${
+                  className={`group relative bg-white dark:bg-neutral-900 p-2.5 sm:p-3.5 rounded-2xl border transition-all duration-300 w-[145px] sm:w-[220px] md:w-[280px] ${
                     isSelectedCard
                       ? 'border-black dark:border-white shadow-[0_25px_50px_-12px_rgba(0,0,0,0.3)] ring-1 ring-black/10 dark:ring-white/20'
                       : 'border-gray-200 dark:border-neutral-800 shadow-sm hover:border-gray-400 dark:hover:border-neutral-600'
@@ -476,8 +501,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   </div>
 
                   {matchedProject && (
-                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between text-[10px] text-gray-500 dark:text-neutral-400 font-mono uppercase tracking-wider">
-                      <span>{matchedProject.index}</span>
+                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-end text-[10px] text-gray-500 dark:text-neutral-400 font-mono uppercase tracking-wider">
                       <span className="text-black dark:text-white font-semibold group-hover:underline">
                         {language === 'zh' ? '查看作品' : 'VIEW'} ↗
                       </span>
@@ -511,7 +535,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   }`}
                 >
                   <div className="w-full h-full rounded-full border border-gray-800 flex items-center justify-center bg-neutral-950">
-                    <span className="text-xl font-light font-sans tracking-tight text-white animate-[pulse_4s_infinite_ease-in-out]">QSi</span>
+                    <div className="w-7 h-7 rounded-full bg-white text-black font-mono font-bold text-[8px] flex items-center justify-center border border-black shadow-xs">
+                      QSi
+                    </div>
                   </div>
                 </div>
               )}

@@ -57,7 +57,7 @@ export const PROJECTS: Project[] = [
   },
   {
     id: 'lin-fengmian-grad',
-    cardNumber: '3♣',
+    cardNumber: '',
     suit: 'club',
     title: '林風眠美術學院畢業展 主視覺',
     subtitle: 'LIN FENGMIAN GRADUATION EXHIBITION',
@@ -105,7 +105,7 @@ export const PROJECTS: Project[] = [
     tags: ['品牌识别', '字体设计', '饮料包装', 'IP衍生'],
     colorPalette: ['#1A1A1A', '#C6F432', '#333333', '#E5E5E5', '#FFFFFF'],
     featured: true,
-    likes: 890
+    likes: 999
   },
   {
     id: 'or-studio',
