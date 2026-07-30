@@ -511,9 +511,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   }`}
                 >
                   <div className="w-full h-full rounded-full border border-gray-800 flex items-center justify-center bg-neutral-950">
-                    <div className="w-7 h-7 rounded-full bg-white text-black font-mono font-bold text-[8px] flex items-center justify-center border border-black shadow-xs">
-                      QSi
-                    </div>
+                    <span className="text-xl font-light font-sans tracking-tight text-white animate-[pulse_4s_infinite_ease-in-out]">QSi</span>
                   </div>
                 </div>
               )}

@@ -91,7 +91,7 @@ export const IntroLoader: React.FC<IntroLoaderProps> = ({ onStartExit, onComplet
           }`}
         >
           <div className="relative group flex items-baseline">
-            <span className="text-5xl sm:text-6xl md:text-7xl font-light font-sans tracking-tight text-neutral-800 dark:text-neutral-100 animate-[pulse_4s_infinite_ease-in-out]">
+            <span className="text-5xl sm:text-6xl md:text-7xl font-light font-sans tracking-tight text-neutral-800 dark:text-neutral-100 animate-[pulse_4s_infinite_ease-in-out] trae-browser-inspect-draggable">
               QSi
             </span>
             <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-neutral-800 dark:bg-neutral-200 animate-ping opacity-75 inline-block mb-1 ml-1" />

@@ -84,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="回到首页 / Home"
             id="header-home-btn"
           >
-            <FourPointStar className="w-4 h-4 text-black dark:text-white" />
+            <span className="text-xl font-light font-sans tracking-tight text-neutral-800 dark:text-neutral-100 animate-[pulse_4s_infinite_ease-in-out]">QSi</span>
           </button>
 
           <button

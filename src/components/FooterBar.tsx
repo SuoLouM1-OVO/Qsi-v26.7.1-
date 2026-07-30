@@ -156,9 +156,7 @@ export const FooterBar: React.FC<FooterBarProps> = ({
             }`}
             id="footer-bottom-left-profile-btn"
           >
-            <div className="w-6 h-6 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-black font-mono text-[10px] tracking-tighter">
-              QSi
-            </div>
+            <span className="text-xl font-light font-sans tracking-tight text-neutral-800 dark:text-neutral-100 animate-[pulse_4s_infinite_ease-in-out]">QSi</span>
             <span className="text-xs font-bold font-mono tracking-tight text-black dark:text-white hidden sm:inline">
               QSi DESIGN
             </span>
