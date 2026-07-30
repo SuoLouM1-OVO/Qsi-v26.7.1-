@@ -1,0 +1,6 @@
+{
+  "name": "齐思设计 / QSi Studio",
+  "description": "Minimalist graphic visual design portfolio for QSi Studio featuring interactive playing cards, dark mode, bilingual toggle, and project archives.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
