@@ -11,11 +11,22 @@ import { AboutTab } from './components/AboutTab';
 import { WorksTab } from './components/WorksTab';
 import { ProjectModal } from './components/ProjectModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
+import { AboutManagerModal } from './components/AboutManagerModal';
+import { GuestbookModal } from './components/GuestbookModal';
 import { CustomCursor } from './components/CustomCursor';
 import { IntroLoader } from './components/IntroLoader';
-import { PROJECTS as INITIAL_DEFAULT_PROJECTS } from './data/portfolioData';
+import { PROJECTS as INITIAL_DEFAULT_PROJECTS, ABOUT_DATA as INITIAL_ABOUT_DATA } from './data/portfolioData';
 import { TabType, Project, Language } from './types';
 import { soundSynth } from './utils/sound';
+import {
+  subscribeCloudProjects,
+  syncProjectsToCloud,
+  deleteCloudProject,
+  subscribeCloudAboutData,
+  syncAboutDataToCloud,
+  subscribeCloudLikes,
+  incrementCloudLike
+} from './services/firebaseService';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -24,7 +35,12 @@ export default function App() {
   const [language, setLanguage] = useState<Language>('zh');
   const [isIntroReady, setIsIntroReady] = useState(false);
 
-  // Dynamic Portfolio Projects State (Loaded from localStorage or default dataset)
+  // Guestbook modal state
+  const [isGuestbookOpen, setIsGuestbookOpen] = useState(false);
+  const [guestbookPreselectId, setGuestbookPreselectId] = useState<string>('');
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Dynamic Portfolio Projects State (Loaded from localStorage or default dataset, then synced with Cloud Firestore)
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('qsi_custom_projects');
     if (saved) {
@@ -32,22 +48,100 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
-        // Fallback to initial default projects
+        // Fallback
       }
     }
     return INITIAL_DEFAULT_PROJECTS;
   });
 
+  const [cloudLikes, setCloudLikes] = useState<Record<string, number>>({});
+
+  // Dynamic About QSi Data State
+  const [aboutData, setAboutData] = useState<typeof INITIAL_ABOUT_DATA>(() => {
+    const saved = localStorage.getItem('qsi_custom_about_data');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return INITIAL_ABOUT_DATA;
+  });
+
+  const [isAboutManagerOpen, setIsAboutManagerOpen] = useState(false);
+
+  // Real-time Cloud Sync Effect
+  useEffect(() => {
+    const unsubProjects = subscribeCloudProjects((cloudList) => {
+      if (cloudList && cloudList.length > 0) {
+        setProjects(cloudList);
+      }
+    }, () => {
+      // Seed default projects to cloud if empty
+      syncProjectsToCloud(INITIAL_DEFAULT_PROJECTS);
+    });
+
+    const unsubAbout = subscribeCloudAboutData((cloudAbout) => {
+      if (cloudAbout) {
+        setAboutData(cloudAbout);
+      }
+    });
+
+    const unsubLikes = subscribeCloudLikes((likesMap) => {
+      setCloudLikes(likesMap);
+    });
+
+    return () => {
+      if (typeof unsubProjects === 'function') unsubProjects();
+      if (typeof unsubAbout === 'function') unsubAbout();
+      if (typeof unsubLikes === 'function') unsubLikes();
+    };
+  }, []);
+
+  const handleSaveAboutData = (updated: typeof INITIAL_ABOUT_DATA) => {
+    setAboutData(updated);
+    try {
+      localStorage.setItem('qsi_custom_about_data', JSON.stringify(updated));
+    } catch (e) {
+      // ignore
+    }
+    syncAboutDataToCloud(updated).catch((e) => console.error('Cloud sync about data err:', e));
+  };
+
+  const handleResetAboutData = () => {
+    setAboutData(INITIAL_ABOUT_DATA);
+    try {
+      localStorage.removeItem('qsi_custom_about_data');
+    } catch (e) {
+      // ignore
+    }
+    syncAboutDataToCloud(INITIAL_ABOUT_DATA).catch((e) => console.error('Cloud reset about data err:', e));
+  };
+
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [managerEditProject, setManagerEditProject] = useState<Project | null>(null);
 
   const handleSaveProjects = (newProjects: Project[]) => {
+    // Detect removed project IDs and purge from Cloud Firestore
+    const newIds = new Set(newProjects.map((p) => p.id));
+    const removedProjects = projects.filter((p) => !newIds.has(p.id));
+
     setProjects(newProjects);
     try {
       localStorage.setItem('qsi_custom_projects', JSON.stringify(newProjects));
     } catch (e) {
-      // ignore quota or storage error
+      // ignore
     }
+
+    // Delete removed items from Cloud Firestore so they don't reappear on real-time sync
+    removedProjects.forEach((p) => {
+      deleteCloudProject(p.id).catch((e) => console.error('Cloud delete project err:', e));
+    });
+
+    // Sync active projects to Cloud Firestore
+    syncProjectsToCloud(newProjects).catch((e) => console.error('Cloud projects sync err:', e));
   };
 
   const handleResetProjects = () => {
@@ -57,6 +151,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    syncProjectsToCloud(INITIAL_DEFAULT_PROJECTS).catch((e) => console.error('Cloud reset err:', e));
   };
 
   // Dark Mode / Night Reading Mode State
@@ -91,14 +186,14 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Global Likes State Management (+1 increment only, capped at 999+)
+  // Global Likes State Management (+1 increment only, merged with Cloud Likes)
   const [userLikeDeltas, setUserLikeDeltas] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('qsi_user_like_deltas');
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        // ignore parse error
+        // ignore
       }
     }
     return {};
@@ -109,11 +204,12 @@ export default function App() {
     const map: Record<string, number> = {};
     projects.forEach((p) => {
       const base = typeof p.likes === 'number' ? p.likes : 12;
-      const delta = userLikeDeltas[p.id] || 0;
-      map[p.id] = base + delta;
+      const cLikes = cloudLikes[p.id] || 0;
+      const localDelta = userLikeDeltas[p.id] || 0;
+      map[p.id] = base + cLikes + localDelta;
     });
     return map;
-  }, [projects, userLikeDeltas]);
+  }, [projects, cloudLikes, userLikeDeltas]);
 
   const handleIncrementLike = (projectId: string) => {
     setUserLikeDeltas((prev) => {
@@ -124,10 +220,13 @@ export default function App() {
       try {
         localStorage.setItem('qsi_user_like_deltas', JSON.stringify(updated));
       } catch (e) {
-        // ignore storage error
+        // ignore
       }
       return updated;
     });
+
+    // Also sync to Cloud Firestore
+    incrementCloudLike(projectId).catch((err) => console.error('Cloud like error:', err));
   };
 
   const playClickSound = () => {
@@ -217,6 +316,13 @@ export default function App() {
           setSelectedProject(project);
           playClickSound();
         }}
+        onOpenGuestbook={() => {
+          playClickSound();
+          setGuestbookPreselectId('');
+          setIsGuestbookOpen(true);
+        }}
+        isEditMode={isEditMode}
+        setIsEditMode={setIsEditMode}
       />
 
       {/* CONTINUOUS SCROLLABLE MAIN CONTENT */}
@@ -238,7 +344,14 @@ export default function App() {
 
         {/* ABOUT SECTION (Placed underneath homepage cards layer z-10) */}
         <section id="about" className="relative z-10 scroll-mt-20">
-          <AboutTab playClickSound={playClickSound} language={language} />
+          <AboutTab
+            playClickSound={playClickSound}
+            language={language}
+            aboutData={aboutData}
+            onOpenAboutManager={() => setIsAboutManagerOpen(true)}
+            onOpenGuestbook={() => setIsGuestbookOpen(true)}
+            isEditMode={isEditMode}
+          />
         </section>
 
         {/* WORKS SECTION */}
@@ -257,6 +370,7 @@ export default function App() {
               setManagerEditProject(null);
               setIsProjectManagerOpen(true);
             }}
+            isEditMode={isEditMode}
           />
         </section>
       </main>
@@ -278,16 +392,23 @@ export default function App() {
         likesMap={likesMap}
         onIncrementLike={handleIncrementLike}
         language={language}
-        onEditProject={(proj) => {
-          setSelectedProject(null);
-          setManagerEditProject(proj);
-          setIsProjectManagerOpen(true);
+        onEditProject={(updatedProj) => {
+          const updated = projects.map((p) => (p.id === updatedProj.id ? updatedProj : p));
+          handleSaveProjects(updated);
+          setSelectedProject(updatedProj);
         }}
         onDeleteProject={(projectId) => {
           const updated = projects.filter((p) => p.id !== projectId);
           handleSaveProjects(updated);
           setSelectedProject(null);
         }}
+        onOpenComment={(projectId) => {
+          setGuestbookPreselectId(projectId);
+          setIsGuestbookOpen(true);
+        }}
+        onSaveProjects={handleSaveProjects}
+        allProjects={projects}
+        isEditMode={isEditMode}
       />
 
       {/* PROJECT MANAGER & REPLACE MODAL */}
@@ -303,6 +424,33 @@ export default function App() {
         playClickSound={playClickSound}
         language={language}
         initialEditProject={managerEditProject}
+        onSelectProject={(proj) => {
+          setSelectedProject(proj);
+        }}
+      />
+
+      {/* ONLINE GUESTBOOK & SUGGESTIONS MODAL */}
+      <GuestbookModal
+        isOpen={isGuestbookOpen}
+        onClose={() => {
+          setIsGuestbookOpen(false);
+          setGuestbookPreselectId('');
+        }}
+        playClickSound={playClickSound}
+        language={language}
+        projects={projects}
+        preselectedProjectId={guestbookPreselectId}
+      />
+
+      {/* ABOUT DATA MANAGER MODAL */}
+      <AboutManagerModal
+        isOpen={isAboutManagerOpen}
+        onClose={() => setIsAboutManagerOpen(false)}
+        aboutData={aboutData}
+        onSaveAboutData={handleSaveAboutData}
+        onResetAboutData={handleResetAboutData}
+        playClickSound={playClickSound}
+        language={language}
       />
 
       {/* INITIALIZATION INTRO LOADER */}

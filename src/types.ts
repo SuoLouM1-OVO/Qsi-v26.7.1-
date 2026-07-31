@@ -63,3 +63,16 @@ export interface AwardItem {
   organization: string;
   category: string;
 }
+
+export interface CustomSectionItem {
+  id: string;
+  mainTitle: string;
+  content: string;
+}
+
+export interface CustomSection {
+  id: string;
+  title: string;
+  items: CustomSectionItem[];
+}
+

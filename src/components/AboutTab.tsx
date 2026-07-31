@@ -27,10 +27,16 @@ import {
 import { ABOUT_DATA } from '../data/portfolioData';
 import { Language } from '../types';
 import { QSiLogo } from './QSiLogo';
+import { Edit3 } from 'lucide-react';
+import { postGuestMessage } from '../services/firebaseService';
 
 interface AboutTabProps {
   playClickSound: () => void;
   language: Language;
+  aboutData?: typeof ABOUT_DATA;
+  onOpenAboutManager?: () => void;
+  onOpenGuestbook?: () => void;
+  isEditMode?: boolean;
 }
 
 interface MessageLogItem {
@@ -58,7 +64,16 @@ const DEFAULT_MESSAGES: MessageLogItem[] = [
   }
 ];
 
-export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) => {
+export const AboutTab: React.FC<AboutTabProps> = ({
+  playClickSound,
+  language,
+  aboutData,
+  onOpenAboutManager,
+  onOpenGuestbook,
+  isEditMode = false
+}) => {
+  const data = aboutData || ABOUT_DATA;
+
   // Accordion state - DEFAULT ONLY BASIC INFO IS EXPANDED
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     profile: true,
@@ -187,7 +202,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleSubmitForm = (e: React.FormEvent) => {
+  const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     playClickSound();
     if (formData.name && formData.email && formData.message) {
@@ -204,6 +219,17 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
 
       const updated = [newRecord, ...inboxMessages];
       saveInbox(updated);
+
+      // Synchronize directly with Cloud Firestore Guestbook
+      try {
+        await postGuestMessage({
+          authorName: formData.name.trim(),
+          email: formData.email.trim(),
+          content: formData.message.trim()
+        });
+      } catch (err) {
+        console.warn('Firebase sync notice:', err);
+      }
 
       setFormData({ name: '', email: '', message: '' });
       setFormSubmitted(true);
@@ -240,22 +266,40 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
             </h1>
           </div>
 
-          {/* Single Toggle Button: Expand All / Collapse All with Rounded Corners */}
-          <button
-            onClick={handleToggleExpandAll}
-            className="self-start sm:self-auto text-[11px] font-mono uppercase tracking-wider text-white dark:text-black bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 px-5 py-2.5 transition-all shadow-xs border border-black dark:border-white flex items-center gap-2 active:scale-95 rounded-full"
-            id="about-toggle-all-btn"
-          >
-            <span>
-              {isAllExpanded
-                ? language === 'zh'
-                  ? '全部折叠 -'
-                  : 'COLLAPSE ALL -'
-                : language === 'zh'
-                ? '全部展开 +'
-                : 'EXPAND ALL +'}
-            </span>
-          </button>
+          {/* Action Control Buttons: Edit Profile & Expand/Collapse Toggle */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {isEditMode && onOpenAboutManager && (
+              <button
+                type="button"
+                onClick={() => {
+                  playClickSound();
+                  onOpenAboutManager();
+                }}
+                className="p-2 rounded-full border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:border-gray-400 dark:hover:border-neutral-600 transition-all cursor-pointer active:scale-95 flex items-center justify-center shrink-0 shadow-2xs"
+                title={language === 'zh' ? '编辑齐思资料' : 'Edit Profile'}
+                id="about-manage-profile-btn"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleExpandAll}
+              className="text-[11px] font-mono uppercase tracking-wider text-gray-700 dark:text-neutral-200 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 px-4 py-2.5 transition-all shadow-2xs border border-gray-200 dark:border-neutral-700 flex items-center gap-1.5 active:scale-95 rounded-full cursor-pointer"
+              id="about-toggle-all-btn"
+            >
+              <span>
+                {isAllExpanded
+                  ? language === 'zh'
+                    ? '全部折叠 -'
+                    : 'COLLAPSE ALL -'
+                  : language === 'zh'
+                  ? '全部展开 +'
+                  : 'EXPAND ALL +'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* ACCORDION SECTIONS */}
@@ -305,27 +349,27 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                       </div>
                       <div className="flex items-baseline gap-2">
                         <h2 className="text-xl font-black text-black dark:text-white">
-                          {ABOUT_DATA.name}
+                          {data.name}
                         </h2>
                         {language === 'zh' && (
                           <span className="text-xs font-mono text-gray-400 dark:text-neutral-500 font-normal">
-                            {ABOUT_DATA.englishName}
+                            {data.englishName}
                           </span>
                         )}
                       </div>
                       <p className="text-xs font-mono text-gray-600 dark:text-neutral-300 mt-1">
-                        {ABOUT_DATA.title}
+                        {data.title}
                       </p>
                       {language === 'zh' && (
                         <p className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 mt-0.5">
-                          {ABOUT_DATA.englishTitle}
+                          {data.englishTitle}
                         </p>
                       )}
                       
                       <div className="mt-4 space-y-1.5 text-xs font-mono text-gray-600 dark:text-neutral-300">
                         <div className="flex items-center gap-2">
                           <span className="text-gray-400 dark:text-neutral-500">{language === 'zh' ? '工作地点:' : 'Location:'}</span>
-                          <span className="text-black dark:text-white font-medium">{ABOUT_DATA.location}</span>
+                          <span className="text-black dark:text-white font-medium">{data.location}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-gray-400 dark:text-neutral-500">{language === 'zh' ? '专业方向:' : 'Focus:'}</span>
@@ -346,9 +390,9 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                           {language === 'zh' ? '邮箱' : 'Email'}:
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{ABOUT_DATA.email}</span>
+                          <span className="text-black dark:text-white font-medium">{data.email}</span>
                           <button
-                            onClick={() => handleCopy(ABOUT_DATA.email, 'email')}
+                            onClick={() => handleCopy(data.email, 'email')}
                             className="p-1 hover:text-black dark:hover:text-white text-gray-400"
                             title="Copy Email"
                           >
@@ -363,9 +407,9 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                           {language === 'zh' ? '电话' : 'Phone'}:
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{ABOUT_DATA.phone}</span>
+                          <span className="text-black dark:text-white font-medium">{data.phone}</span>
                           <button
-                            onClick={() => handleCopy(ABOUT_DATA.phone, 'phone')}
+                            onClick={() => handleCopy(data.phone, 'phone')}
                             className="p-1 hover:text-black dark:hover:text-white text-gray-400"
                             title="Copy Phone"
                           >
@@ -380,9 +424,9 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                           {language === 'zh' ? '微信' : 'WeChat'}:
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{ABOUT_DATA.wechat}</span>
+                          <span className="text-black dark:text-white font-medium">{data.wechat}</span>
                           <button
-                            onClick={() => handleCopy(ABOUT_DATA.wechat, 'wechat')}
+                            onClick={() => handleCopy(data.wechat, 'wechat')}
                             className="p-1 hover:text-black dark:hover:text-white text-gray-400"
                             title="Copy WeChat"
                           >
@@ -397,9 +441,9 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                           QQ:
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{ABOUT_DATA.qq}</span>
+                          <span className="text-black dark:text-white font-medium">{data.qq}</span>
                           <button
-                            onClick={() => handleCopy(ABOUT_DATA.qq, 'qq')}
+                            onClick={() => handleCopy(data.qq, 'qq')}
                             className="p-1 hover:text-black dark:hover:text-white text-gray-400"
                             title="Copy QQ"
                           >
@@ -454,7 +498,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                 >
                   <div className="p-5 sm:p-6 space-y-4">
                     <div className="p-4 bg-black dark:bg-white text-white dark:text-black rounded-xl space-y-1">
-                      {ABOUT_DATA.manifesto.map((line, idx) => (
+                      {(Array.isArray(data.manifesto) ? data.manifesto : [data.manifesto]).map((line, idx) => (
                         <p key={idx} className="text-xs sm:text-sm font-serif italic">
                           {line}
                         </p>
@@ -462,7 +506,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                     </div>
 
                     <p className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300 leading-relaxed font-sans">
-                      {ABOUT_DATA.bio}
+                      {data.bio}
                     </p>
                   </div>
                 </motion.div>
@@ -514,7 +558,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                         {language === 'zh' ? '核心技能标签' : 'CAPABILITY TAGS'}
                       </span>
                       <div className="flex flex-wrap gap-2">
-                        {skillTagList.map((tag, idx) => (
+                        {(data.skillTags || skillTagList).map((tag, idx) => (
                           <div
                             key={idx}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-neutral-800 text-black dark:text-white border border-gray-300 dark:border-neutral-700 hover:border-black dark:hover:border-white transition-all text-xs font-mono shadow-2xs group rounded-xl"
@@ -528,7 +572,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
 
                     {/* Grouped Category Breakdown */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gray-100 dark:border-neutral-800">
-                      {ABOUT_DATA.skills.map((grp, idx) => (
+                      {(data.skills || ABOUT_DATA.skills).map((grp, idx) => (
                         <div key={idx} className="p-4 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl">
                           <h4 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider mb-2 font-mono">
                             {grp.category}
@@ -588,7 +632,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                   className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
                 >
                   <div className="p-5 sm:p-6 space-y-3">
-                    {ABOUT_DATA.education.map((edu, idx) => (
+                    {(data.education || []).map((edu, idx) => (
                       <div key={idx} className="p-4 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                           <span className="text-[10px] font-mono bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 self-start font-bold rounded-md">
@@ -647,7 +691,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                   className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
                 >
                   <div className="p-5 sm:p-6 space-y-4">
-                    {ABOUT_DATA.experience.map((exp, idx) => (
+                    {(data.experience || []).map((exp, idx) => (
                       <div key={idx} className="p-4 bg-white dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                           <span className="text-[10px] font-mono bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 self-start rounded-md">
@@ -704,7 +748,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                   className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
                 >
                   <div className="p-5 sm:p-6 space-y-2 font-mono text-xs">
-                    {ABOUT_DATA.awards.map((award, idx) => (
+                    {(data.awards || []).map((award, idx) => (
                       <div
                         key={idx}
                         className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl gap-1"
@@ -721,6 +765,75 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
               )}
             </AnimatePresence>
           </motion.div>
+
+          {/* DYNAMIC CUSTOM SECTIONS CARDS */}
+          {((data as any).customSections || []).map((cSec: any, cIdx: number) => {
+            const secKey = `custom_${cSec.id || cIdx}`;
+            const isOpen = openSections[secKey] !== false; // Default open
+
+            return (
+              <motion.div
+                key={secKey}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-30px' }}
+                transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 * cIdx }}
+                className="border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-2xl overflow-hidden shadow-2xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleSection(secKey)}
+                  className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
+                      <span>{String(7 + cIdx).padStart(2, '0')}. {cSec.title || '自定义卡片'}</span>
+                      <span className="text-[10px] font-mono font-normal text-gray-400 dark:text-neutral-500 uppercase tracking-widest">
+                        CUSTOM CARD
+                      </span>
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${
+                      isOpen ? 'rotate-180 text-black dark:text-white' : ''
+                    }`}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
+                    >
+                      <div className="p-5 sm:p-6 space-y-4 font-sans">
+                        {(cSec.items || []).map((item: any, itemIdx: number) => (
+                          <div
+                            key={item.id || itemIdx}
+                            className="p-4 bg-gray-50/80 dark:bg-neutral-950/80 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2"
+                          >
+                            {item.mainTitle && (
+                              <h4 className="text-sm font-bold text-black dark:text-white font-sans flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white" />
+                                <span>{item.mainTitle}</span>
+                              </h4>
+                            )}
+                            {item.content && (
+                              <p className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300 leading-relaxed font-sans whitespace-pre-wrap pl-3 border-l-2 border-gray-300 dark:border-neutral-700">
+                                {item.content}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
 
           {/* SECTION 7: CONTACT FORM */}
           <motion.div
@@ -807,14 +920,16 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                       <div className="flex flex-col sm:flex-row gap-3">
                         <button
                           type="submit"
-                          className="flex-1 bg-black dark:bg-white text-white dark:text-black py-3 px-4 text-xs font-mono font-bold tracking-widest uppercase hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-all rounded-xl shadow-xs active:scale-98"
+                          className="flex-1 bg-black dark:bg-white text-white dark:text-black py-3 px-4 text-xs font-mono font-bold tracking-widest uppercase hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-all rounded-xl shadow-xs active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
                         >
-                          {language === 'zh' ? '发送在线留言 / SUBMIT MESSAGE' : 'SUBMIT MESSAGE'}
+                          <Send className="w-3.5 h-3.5" />
+                          <span>{language === 'zh' ? '发送在线留言 / SUBMIT MESSAGE' : 'SUBMIT MESSAGE'}</span>
                         </button>
+
                         <button
                           type="button"
                           onClick={handleCopyMyEmail}
-                          className="px-4 py-3 bg-gray-100 dark:bg-neutral-800 text-black dark:text-white text-xs font-mono font-medium rounded-xl border border-gray-200 dark:border-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-700 transition-all flex items-center justify-center gap-1.5"
+                          className="px-4 py-3 bg-gray-100 dark:bg-neutral-800 text-black dark:text-white text-xs font-mono font-medium rounded-xl border border-gray-200 dark:border-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           {copiedEmail ? (
                             <>
@@ -838,7 +953,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ playClickSound, language }) 
                       <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center space-y-1.5 rounded-2xl animate-fade-in">
                         <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mx-auto" />
                         <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200 font-mono">
-                          {language === 'zh' ? '留言成功！已实时保存至收件箱日志。' : 'MESSAGE SAVED! STORED IN LOCAL INBOX LOG.'}
+                          {language === 'zh' ? '留言成功！已实时保存与云端同步。' : 'MESSAGE SAVED! STORED & SYNCED LIVE ON CLOUD.'}
                         </h4>
                       </div>
                     )}

@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Projects collection
+    match /projects/{projectId} {
+      allow read, write: if true;
+    }
+
+    // Guestbook messages collection
+    match /messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Likes collection
+    match /likes/{likeId} {
+      allow read, write: if true;
+    }
+
+    // Default rule
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

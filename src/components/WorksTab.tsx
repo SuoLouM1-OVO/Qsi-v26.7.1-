@@ -14,6 +14,7 @@ interface WorksTabProps {
   onIncrementLike: (projectId: string) => void;
   language?: Language;
   onOpenProjectManager?: () => void;
+  isEditMode?: boolean;
 }
 
 export const WorksTab: React.FC<WorksTabProps> = ({
@@ -23,7 +24,8 @@ export const WorksTab: React.FC<WorksTabProps> = ({
   likesMap,
   onIncrementLike,
   language = 'zh',
-  onOpenProjectManager
+  onOpenProjectManager,
+  isEditMode = false
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<WorkCategory>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'deck'>('grid');
@@ -150,13 +152,14 @@ export const WorksTab: React.FC<WorksTabProps> = ({
 
           {/* Compact View Mode Switcher & Manage Projects Button */}
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            {onOpenProjectManager && (
+            {isEditMode && onOpenProjectManager && (
               <button
+                type="button"
                 onClick={() => {
                   playClickSound();
                   onOpenProjectManager();
                 }}
-                className="p-2 rounded-full bg-black text-white dark:bg-white dark:text-black hover:opacity-90 transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center justify-center shrink-0"
+                className="p-2 rounded-full border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:border-gray-400 dark:hover:border-neutral-600 transition-all cursor-pointer active:scale-95 flex items-center justify-center shrink-0 shadow-2xs"
                 title={language === 'zh' ? '管理或替换作品集' : 'Manage or Replace Projects'}
                 id="works-manage-projects-btn"
               >
@@ -231,33 +234,6 @@ export const WorksTab: React.FC<WorksTabProps> = ({
               );
             })}
           </div>
-
-          {/* DYNAMIC SYNCED TAGS BAR (Live extracted from cards) */}
-          {dynamicTags.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 scrollbar-none text-[11px] font-mono border-t border-gray-100/60 dark:border-neutral-800/60 pt-2">
-              <span className="text-gray-400 dark:text-neutral-500 shrink-0 font-sans text-[10px] uppercase tracking-wider mr-1">
-                {language === 'zh' ? '实时标签同步:' : 'Live Tags:'}
-              </span>
-              {dynamicTags.map(({ tag, count }) => {
-                const tagId = `tag:${tag}`;
-                const isSelected = selectedCategory === tagId;
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => handleCategoryChange(tagId as any)}
-                    className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap flex items-center gap-1 shrink-0 ${
-                      isSelected
-                        ? 'bg-black text-white dark:bg-white dark:text-black font-bold shadow-xs'
-                        : 'bg-gray-100 dark:bg-neutral-800/80 text-gray-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
-                    }`}
-                  >
-                    <span>#{tag}</span>
-                    <span className="text-[9px] opacity-60 font-sans">({count})</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
         {/* SKELETON LOADING OR CONTENT */}

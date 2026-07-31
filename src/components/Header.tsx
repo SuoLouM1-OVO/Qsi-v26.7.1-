@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Menu, X, Home, FolderKanban, User, Check, Moon, ChevronRight, ChevronLeft, History, Tag, Trash2, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, Menu, X, Home, FolderKanban, User, Check, Moon, ChevronRight, ChevronLeft, History, Tag, Trash2, ArrowRight, Sparkles, MessageSquare, Settings, Lock, Unlock, ShieldCheck, KeyRound } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TabType, Language, Project } from '../types';
 
@@ -15,6 +15,9 @@ interface HeaderProps {
   setDarkMode: (val: boolean) => void;
   projects?: Project[];
   onSelectProject?: (project: Project) => void;
+  onOpenGuestbook?: () => void;
+  isEditMode: boolean;
+  setIsEditMode: (mode: boolean) => void;
 }
 
 const HOT_TAGS = ['品牌视觉', '展陈空间', '包装设计', '书籍装帧', '2026', '照片特展'];
@@ -30,9 +33,15 @@ export const Header: React.FC<HeaderProps> = ({
   darkMode,
   setDarkMode,
   projects = [],
-  onSelectProject
+  onSelectProject,
+  onOpenGuestbook,
+  isEditMode,
+  setIsEditMode
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [passInput, setPassInput] = useState('');
+  const [passError, setPassError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [manualTitleExpanded, setManualTitleExpanded] = useState(false);
@@ -69,11 +78,12 @@ export const Header: React.FC<HeaderProps> = ({
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         if (dropdownOpen) setDropdownOpen(false);
         if (isSearchOpen) onOpenSearch();
+        if (isSettingsOpen) setIsSettingsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [dropdownOpen, isSearchOpen, onOpenSearch]);
+  }, [dropdownOpen, isSearchOpen, isSettingsOpen, onOpenSearch]);
 
   const saveSearchTerm = (term: string) => {
     const clean = term.trim();
@@ -131,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between">
         
         {/* Left Side: Home Button + Brand Title Pill (Collapses on Scroll, can be manually expanded) */}
-        <div className="flex items-center pointer-events-auto">
+        <div className="flex items-center pointer-events-auto relative">
           <motion.div
             layout
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
@@ -139,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <button
               onClick={() => setActiveTab('home')}
-              className="p-1 text-black dark:text-white hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors flex items-center justify-center shrink-0"
+              className="p-1 text-black dark:text-white hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
               title="回到首页 / Home"
               id="header-home-btn"
             >
@@ -160,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                   <button
                     onClick={() => setActiveTab('works')}
-                    className="group flex items-center gap-1.5 text-left focus:outline-none shrink-0"
+                    className="group flex items-center gap-1.5 text-left focus:outline-none shrink-0 cursor-pointer"
                     id="header-brand-title-btn"
                   >
                     <span className="text-xs font-bold tracking-tight text-black dark:text-white font-sans">
@@ -174,7 +184,7 @@ export const Header: React.FC<HeaderProps> = ({
                   {isScrolled && (
                     <button
                       onClick={() => setManualTitleExpanded(false)}
-                      className="p-0.5 ml-1 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-full text-gray-400 dark:text-neutral-500 transition-colors shrink-0"
+                      className="p-0.5 ml-0.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-full text-gray-400 dark:text-neutral-500 transition-colors shrink-0 cursor-pointer"
                       title="折叠名称"
                     >
                       <ChevronLeft className="w-3 h-3" />
@@ -182,19 +192,15 @@ export const Header: React.FC<HeaderProps> = ({
                   )}
                 </motion.div>
               ) : (
-                <motion.button
+                <button
                   key="expand-btn"
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 'auto', opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
                   onClick={() => setManualTitleExpanded(true)}
-                  className="flex items-center gap-1 pl-1 text-[11px] font-mono text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors"
+                  className="flex items-center gap-1 pl-1 text-[11px] font-mono text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                   title="点击展开作品集名称"
                   id="header-expand-brand-btn"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
-                </motion.button>
+                </button>
               )}
             </AnimatePresence>
           </motion.div>
@@ -203,6 +209,23 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Right Side: Quick Search & Menu Controls */}
         <div className="relative flex items-center gap-2 pointer-events-auto" ref={dropdownRef}>
           
+          {/* Guestbook Quick Button (Icon-Only) */}
+          {onOpenGuestbook && (
+            <button
+              type="button"
+              onClick={() => {
+                if (dropdownOpen) setDropdownOpen(false);
+                if (isSearchOpen) onOpenSearch();
+                onOpenGuestbook();
+              }}
+              className="h-8 w-8 sm:h-8.5 sm:w-8.5 flex items-center justify-center backdrop-blur-md rounded-full border border-gray-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 text-black dark:text-white hover:border-gray-400 dark:hover:border-neutral-600 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
+              title={language === 'zh' ? '打开云端在线留言板' : 'View or submit live comments'}
+              id="header-guestbook-pill-btn"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-500 stroke-[1.75]" />
+            </button>
+          )}
+
           {/* Permanent Search Button (Static Position, Never Moves) */}
           <button
             type="button"
@@ -210,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
               if (dropdownOpen) setDropdownOpen(false);
               onOpenSearch();
             }}
-            className={`h-8 w-8 sm:h-8.5 sm:w-8.5 flex items-center justify-center backdrop-blur-md rounded-full border shadow-2xs transition-all active:scale-95 shrink-0 ${
+            className={`h-8 w-8 sm:h-8.5 sm:w-8.5 flex items-center justify-center backdrop-blur-md rounded-full border shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer ${
               isSearchOpen
                 ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white ring-2 ring-black/10 dark:ring-white/20'
                 : 'text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-white/90 dark:bg-neutral-900/90 border-gray-200 dark:border-neutral-800 hover:border-gray-400 dark:hover:border-neutral-600'
@@ -230,9 +253,10 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             onClick={() => {
               if (isSearchOpen) onOpenSearch();
+              if (isSettingsOpen) setIsSettingsOpen(false);
               setDropdownOpen(!dropdownOpen);
             }}
-            className={`h-8 w-8 sm:h-8.5 sm:w-8.5 flex items-center justify-center backdrop-blur-md rounded-full border shadow-2xs transition-all active:scale-95 shrink-0 ${
+            className={`h-8 w-8 sm:h-8.5 sm:w-8.5 flex items-center justify-center backdrop-blur-md rounded-full border shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer ${
               dropdownOpen
                 ? 'bg-black text-white dark:bg-white dark:text-black border-black dark:border-white ring-2 ring-black/10 dark:ring-white/20'
                 : 'text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-white/90 dark:bg-neutral-900/90 border-gray-200 dark:border-neutral-800 hover:border-gray-400 dark:hover:border-neutral-600'
@@ -420,12 +444,141 @@ export const Header: React.FC<HeaderProps> = ({
                 style={{ transformOrigin: 'top right' }}
                 className="absolute top-full right-0 mt-2 z-50 w-[calc(100vw-24px)] max-w-[280px] sm:w-72 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border border-gray-200 dark:border-neutral-800 shadow-2xl rounded-2xl p-3.5 overflow-hidden"
               >
-                <div className="flex items-center gap-2 pb-2.5 mb-2 border-b border-gray-100 dark:border-neutral-800">
-                  <Sparkles className="w-3.5 h-3.5 text-black dark:text-white ml-1" />
-                  <span className="text-[11px] font-mono font-bold text-black dark:text-white uppercase tracking-wider">
-                    {language === 'zh' ? '齐思工作室菜单' : 'QSI STUDIO MENU'}
-                  </span>
+                <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-gray-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Sparkles className="w-3.5 h-3.5 text-black dark:text-white shrink-0 ml-0.5" />
+                    <span className="text-[11px] font-mono font-bold text-black dark:text-white uppercase tracking-wider truncate">
+                      {language === 'zh' ? '齐思工作室菜单' : 'QSI STUDIO MENU'}
+                    </span>
+                  </div>
+
+                  {/* Settings / Mode Button inside Menu Window Header */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsSettingsOpen(!isSettingsOpen);
+                    }}
+                    className={`px-2 py-0.5 rounded-lg transition-all flex items-center gap-1 text-[10px] font-mono cursor-pointer shrink-0 ${
+                      isSettingsOpen || isEditMode
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-bold border border-amber-300/60 dark:border-amber-700/60'
+                        : 'bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-700 hover:text-black dark:hover:text-white'
+                    }`}
+                    title={isEditMode ? '编辑模式 (点击设置)' : '切换模式 (访客/编辑)'}
+                    id="menu-header-settings-btn"
+                  >
+                    {isEditMode ? (
+                      <>
+                        <Unlock className="w-3 h-3 text-amber-600 dark:text-amber-400 stroke-[2]" />
+                        <span>{language === 'zh' ? '编辑模式' : 'EDIT'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Settings className="w-3 h-3 stroke-[1.75]" />
+                        <span>{language === 'zh' ? '访客模式' : 'GUEST'}</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+
+                {/* Inline Mode Switch / Password Panel inside the Menu Popup */}
+                <AnimatePresence>
+                  {isSettingsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden mb-2.5"
+                    >
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="p-2.5 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2"
+                      >
+                        {isEditMode ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-gray-500 dark:text-neutral-400">
+                                {language === 'zh' ? '模式状态:' : 'Status:'}
+                              </span>
+                              <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <Unlock className="w-3 h-3" />
+                                {language === 'zh' ? '已解锁编辑权限' : 'Unlocked'}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsEditMode(false);
+                                setIsSettingsOpen(false);
+                              }}
+                              className="w-full py-1.5 px-2 text-xs font-mono font-bold bg-gray-200 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-red-500 hover:text-white rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Lock className="w-3 h-3" />
+                              <span>{language === 'zh' ? '退出编辑模式' : 'Exit Edit Mode'}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (passInput.trim() === '269172') {
+                                setIsEditMode(true);
+                                setPassError(false);
+                                setPassInput('');
+                                setIsSettingsOpen(false);
+                              } else {
+                                setPassError(true);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="space-y-2"
+                          >
+                            <div className="space-y-1">
+                              <input
+                                type="password"
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onFocus={(e) => e.stopPropagation()}
+                                value={passInput}
+                                onChange={(e) => {
+                                  setPassInput(e.target.value);
+                                  if (passError) setPassError(false);
+                                }}
+                                placeholder={language === 'zh' ? '密码' : 'Password'}
+                                className={`w-full px-2.5 py-1.5 text-xs font-mono bg-white dark:bg-neutral-900 border rounded-lg focus:outline-none transition-colors ${
+                                  passError
+                                    ? 'border-red-500 text-red-600 dark:text-red-400 ring-1 ring-red-500'
+                                    : 'border-gray-200 dark:border-neutral-700 focus:border-black dark:focus:border-white text-black dark:text-white'
+                                }`}
+                              />
+
+                              {passError && (
+                                <p className="text-[10px] font-mono text-red-500 py-0.5">
+                                  {language === 'zh' ? '密码错误' : 'Incorrect Password'}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="submit"
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full py-1.5 px-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                            >
+                              <KeyRound className="w-3 h-3" />
+                              <span>{language === 'zh' ? '确认切换编辑模式' : 'Unlock Edit Mode'}</span>
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Menu Navigation Items */}
                 <div className="space-y-1">
@@ -453,6 +606,25 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
                     );
                   })}
+
+                  {onOpenGuestbook && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenGuestbook();
+                        setDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-sans rounded-xl text-gray-700 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-500 stroke-[1.5]" />
+                        <span className="font-medium text-black dark:text-white">{language === 'zh' ? '在线留言/修改建议' : 'Live Guestbook & Feedback'}</span>
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.2 rounded">
+                        ONLINE
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="my-2.5 border-t border-gray-100 dark:border-neutral-800" />
@@ -477,7 +649,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 </div>
 
-                <div className="my-2.5 border-t border-gray-100 dark:border-neutral-800" />
+                <div className="my-2 border-t border-gray-100 dark:border-neutral-800" />
 
                 {/* Language Switcher in Dropdown (Simplified CN / EN) */}
                 <div className="px-0.5 py-0.5">

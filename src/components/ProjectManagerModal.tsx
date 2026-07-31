@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Plus, Edit3, Trash2, Code, RotateCcw, Check, Copy, AlertCircle, Image as ImageIcon, Undo, Save } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Edit3,
+  Trash2,
+  Code,
+  RotateCcw,
+  Check,
+  Copy,
+  AlertCircle,
+  Image as ImageIcon,
+  Undo,
+  Eye,
+  Save
+} from 'lucide-react';
 import { Project, WorkCategory, Language } from '../types';
-import { PROJECTS as DEFAULT_PROJECTS } from '../data/portfolioData';
+import { ColorPaletteEditor } from './ColorPaletteEditor';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -13,6 +27,7 @@ interface ProjectManagerModalProps {
   playClickSound: () => void;
   language?: Language;
   initialEditProject?: Project | null;
+  onSelectProject?: (project: Project) => void;
 }
 
 export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
@@ -23,7 +38,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   onResetProjects,
   playClickSound,
   language = 'zh',
-  initialEditProject = null
+  initialEditProject = null,
+  onSelectProject
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'edit' | 'json'>('list');
   const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
@@ -32,12 +48,14 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showFormDeleteConfirm, setShowFormDeleteConfirm] = useState(false);
 
   // Draft projects session state
   const [draftProjects, setDraftProjects] = useState<Project[]>(projects);
   const initialSessionRef = useRef<Project[]>(projects);
   const [historyStack, setHistoryStack] = useState<Project[][]>([]);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const initialEditFormRef = useRef<Partial<Project> | null>(null);
 
   // Reset session draft when modal opens
   useEffect(() => {
@@ -46,15 +64,28 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       initialSessionRef.current = [...projects];
       setHistoryStack([]);
       setShowExitConfirm(false);
+      setShowFormDeleteConfirm(false);
     }
   }, [isOpen, projects]);
 
   useEffect(() => {
     if (initialEditProject) {
+      initialEditFormRef.current = JSON.parse(JSON.stringify(initialEditProject));
       setEditingProject(initialEditProject);
       setActiveTab('edit');
     }
   }, [initialEditProject]);
+
+  useEffect(() => {
+    if (editingProject && activeTab === 'edit') {
+      if (!initialEditFormRef.current || initialEditFormRef.current.id !== editingProject.id) {
+        initialEditFormRef.current = JSON.parse(JSON.stringify(editingProject));
+      }
+    } else if (activeTab !== 'edit') {
+      initialEditFormRef.current = null;
+      setShowFormDeleteConfirm(false);
+    }
+  }, [editingProject, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'json') {
@@ -79,6 +110,16 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   // 1. Undo last step
   const handleUndoStep = () => {
     playClickSound();
+    if (
+      activeTab === 'edit' &&
+      editingProject &&
+      initialEditFormRef.current &&
+      JSON.stringify(editingProject) !== JSON.stringify(initialEditFormRef.current)
+    ) {
+      setEditingProject(JSON.parse(JSON.stringify(initialEditFormRef.current)));
+      showToast(language === 'zh' ? '已撤销当前作品编辑，还原初始信息' : 'Form edits undone');
+      return;
+    }
     if (historyStack.length === 0) return;
     const previousState = historyStack[historyStack.length - 1];
     setHistoryStack((prev) => prev.slice(0, -1));
@@ -137,7 +178,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       title: '',
       subtitle: '',
       category: 'branding',
-      categoryLabel: 'BRANDING / TYPE',
+      categoryLabel: 'BRANDING',
       year: new Date().getFullYear().toString(),
       index: nextIndex,
       client: 'QSi Client',
@@ -148,9 +189,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       summary: '',
       description: [''],
       tags: ['品牌设计', '平面视觉'],
-      colorPalette: ['#121212', '#737373', '#D4D4D8', '#FAFAFA'],
+      colorPalette: ['#18181b', '#3f3f46', '#71717a', '#a1a1aa', '#e4e4e7'],
       featured: true,
-      likes: 10
+      likes: 12
     });
     setActiveTab('edit');
   };
@@ -165,8 +206,24 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
     playClickSound();
     const updated = draftProjects.filter((p) => p.id !== id);
     pushToDraft(updated);
+    initialSessionRef.current = [...updated];
     setDeletingId(null);
-    showToast(language === 'zh' ? '作品已从列表中移除！' : 'Project removed!');
+    onSaveProjects(updated);
+    showToast(language === 'zh' ? '作品已成功删除并同步至网页！' : 'Project deleted and synced!');
+  };
+
+  const handleConfirmDeleteFromForm = () => {
+    if (!editingProject || !editingProject.id) return;
+    playClickSound();
+    const targetId = editingProject.id;
+    const updated = draftProjects.filter((p) => p.id !== targetId);
+    pushToDraft(updated);
+    initialSessionRef.current = [...updated];
+    onSaveProjects(updated);
+    showToast(language === 'zh' ? '作品已删除，并返回管理列表' : 'Project deleted and returned to list!');
+    setEditingProject(null);
+    setShowFormDeleteConfirm(false);
+    setActiveTab('list'); // Switch directly back to project list view!
   };
 
   const handleSaveForm = (e: React.FormEvent) => {
@@ -184,7 +241,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       title: editingProject.title || 'Untitled',
       subtitle: editingProject.subtitle || 'SUBTITLE',
       category: (editingProject.category as WorkCategory) || 'branding',
-      categoryLabel: editingProject.categoryLabel || `${(editingProject.category || 'BRANDING').toUpperCase()} / TYPE`,
+      categoryLabel: editingProject.categoryLabel || `${(editingProject.category || 'BRANDING').toUpperCase()}`,
       year: editingProject.year || `${new Date().getFullYear()}`,
       index: editingProject.index || `01/${draftProjects.length || 1}`,
       client: editingProject.client || 'QSi Client',
@@ -199,9 +256,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       tags: editingProject.tags && editingProject.tags.length > 0 ? editingProject.tags : ['平面设计'],
       colorPalette: editingProject.colorPalette && editingProject.colorPalette.length > 0
         ? editingProject.colorPalette
-        : ['#121212', '#737373', '#FFFFFF'],
+        : ['#18181b', '#3f3f46', '#71717a', '#a1a1aa', '#e4e4e7'],
       featured: editingProject.featured ?? true,
-      likes: editingProject.likes ?? 10
+      likes: editingProject.likes ?? 12
     };
 
     const existsIndex = draftProjects.findIndex((p) => p.id === fullProject.id);
@@ -214,7 +271,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
     }
 
     pushToDraft(updated);
-    showToast(language === 'zh' ? '作品已存入列表！' : 'Project draft saved!');
+    onSaveProjects(updated);
+    showToast(language === 'zh' ? '作品已更新并保存至作品列表！' : 'Project draft saved!');
     setEditingProject(null);
     setActiveTab('list');
   };
@@ -228,8 +286,9 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
         return;
       }
       pushToDraft(parsed);
+      onSaveProjects(parsed);
       setJsonError(null);
-      showToast(language === 'zh' ? '已通过 JSON 批量替换所有作品草稿！' : 'Batch updated all projects via JSON!');
+      showToast(language === 'zh' ? '已通过 JSON 批量替换所有作品并同步至网页！' : 'Batch updated all projects via JSON!');
       setActiveTab('list');
     } catch (err: any) {
       setJsonError(err?.message || 'Invalid JSON syntax');
@@ -293,14 +352,24 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
               {/* Undo Button */}
               <button
                 type="button"
-                disabled={historyStack.length === 0}
+                disabled={
+                  activeTab === 'edit'
+                    ? (!initialEditFormRef.current || JSON.stringify(editingProject) === JSON.stringify(initialEditFormRef.current))
+                    : historyStack.length === 0
+                }
                 onClick={handleUndoStep}
                 className={`p-2 rounded-lg transition-all flex items-center justify-center shrink-0 ${
-                  historyStack.length > 0
+                  (activeTab === 'edit'
+                    ? (initialEditFormRef.current && JSON.stringify(editingProject) !== JSON.stringify(initialEditFormRef.current))
+                    : historyStack.length > 0)
                     ? 'text-gray-700 dark:text-neutral-200 hover:text-black dark:hover:text-white bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 cursor-pointer active:scale-95'
                     : 'text-gray-300 dark:text-neutral-700 bg-gray-50 dark:bg-neutral-900 cursor-not-allowed opacity-50'
                 }`}
-                title={language === 'zh' ? `撤回一步 (${historyStack.length})` : `Undo step (${historyStack.length})`}
+                title={
+                  language === 'zh'
+                    ? (activeTab === 'edit' ? '撤销当前修改 (Undo)' : `撤回一步 (${historyStack.length})`)
+                    : 'Undo'
+                }
               >
                 <Undo className="w-4 h-4" />
               </button>
@@ -335,7 +404,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
               <button
                 type="button"
                 onClick={handleRequestClose}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-500 hover:text-black dark:hover:text-white transition-colors"
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-500 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                 title={language === 'zh' ? '退出管理' : 'Close Manager'}
               >
                 <X className="w-5 h-5" />
@@ -351,7 +420,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                   playClickSound();
                   setActiveTab('list');
                 }}
-                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 shrink-0 ${
+                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   activeTab === 'list'
                     ? 'bg-black text-white dark:bg-white dark:text-black font-bold'
                     : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800'
@@ -365,7 +434,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
 
               <button
                 onClick={handleStartNew}
-                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 shrink-0 ${
+                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   activeTab === 'edit'
                     ? 'bg-black text-white dark:bg-white dark:text-black font-bold'
                     : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800'
@@ -380,7 +449,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                   playClickSound();
                   setActiveTab('json');
                 }}
-                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 shrink-0 ${
+                className={`px-3 py-1.5 text-xs font-mono rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   activeTab === 'json'
                     ? 'bg-black text-white dark:bg-white dark:text-black font-bold'
                     : 'text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800'
@@ -400,8 +469,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-gray-500 dark:text-neutral-400 font-sans">
                     {language === 'zh'
-                      ? '支持随时添加、编辑或删除作品。所有操作可快捷撤回或恢复编辑前状态。'
-                      : 'Add, edit, or remove projects anytime. Actions can be undone or reverted.'}
+                      ? '点击作品项可直接查看详情；亦可随时编辑或删除作品。'
+                      : 'Click any project to view details, or use controls to edit or remove.'}
                   </p>
                   <button
                     onClick={handleStartNew}
@@ -418,18 +487,28 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       key={proj.id}
                       className="group p-3 border border-gray-200 dark:border-neutral-800 rounded-xl bg-gray-50/50 dark:bg-neutral-900/50 hover:bg-white dark:hover:bg-neutral-800/80 transition-all flex items-center justify-between gap-3 relative"
                     >
-                      <div className="flex items-center gap-3 overflow-hidden">
+                      {/* Clickable Card Area: opens project detail */}
+                      <div
+                        onClick={() => {
+                          playClickSound();
+                          if (onSelectProject) {
+                            onSelectProject(proj);
+                          }
+                        }}
+                        className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer"
+                        title={language === 'zh' ? '点击查看作品详情' : 'Click to view project details'}
+                      >
                         <img
                           src={proj.coverImage}
                           alt={proj.title}
-                          className="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-neutral-700 shrink-0"
+                          className="w-14 h-14 object-cover rounded-lg border border-gray-200 dark:border-neutral-700 shrink-0 group-hover:scale-105 transition-transform"
                           referrerPolicy="no-referrer"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=400&q=80';
                           }}
                         />
                         <div className="overflow-hidden">
-                          <h4 className="text-sm font-bold text-black dark:text-white truncate">
+                          <h4 className="text-sm font-bold text-black dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {proj.title}
                           </h4>
                           <p className="text-xs font-mono text-gray-500 dark:text-neutral-400 truncate">
@@ -445,6 +524,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                         </div>
                       </div>
 
+                      {/* Item Action Controls */}
                       <div className="flex items-center gap-1 shrink-0">
                         {deletingId === proj.id ? (
                           <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/50 p-1 rounded-lg border border-red-200 dark:border-red-800 animate-fadeIn">
@@ -454,7 +534,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteCard(proj.id)}
-                              className="px-2 py-0.5 text-[10px] font-mono font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-2xs"
+                              className="px-2 py-0.5 text-[10px] font-mono font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-2xs cursor-pointer"
                             >
                               {language === 'zh' ? '确认' : 'Yes'}
                             </button>
@@ -464,17 +544,30 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                                 playClickSound();
                                 setDeletingId(null);
                               }}
-                              className="px-2 py-0.5 text-[10px] font-mono bg-gray-200 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 rounded hover:bg-gray-300 transition-colors"
+                              className="px-2 py-0.5 text-[10px] font-mono bg-gray-200 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 rounded hover:bg-gray-300 transition-colors cursor-pointer"
                             >
                               {language === 'zh' ? '取消' : 'No'}
                             </button>
                           </div>
                         ) : (
                           <>
+                            {onSelectProject && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  playClickSound();
+                                  onSelectProject(proj);
+                                }}
+                                className="p-2 text-gray-500 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
+                                title={language === 'zh' ? '查看作品详情' : 'View Details'}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleEditClick(proj)}
-                              className="p-2 text-gray-600 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+                              className="p-2 text-gray-600 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                               title={language === 'zh' ? '编辑作品' : 'Edit Project'}
                             >
                               <Edit3 className="w-4 h-4" />
@@ -485,7 +578,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                                 playClickSound();
                                 setDeletingId(proj.id);
                               }}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer"
                               title={language === 'zh' ? '删除作品' : 'Delete Project'}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -515,7 +608,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       setEditingProject(null);
                       setActiveTab('list');
                     }}
-                    className="text-xs font-mono text-gray-500 hover:text-black dark:hover:text-white"
+                    className="text-xs font-mono text-gray-500 hover:text-black dark:hover:text-white cursor-pointer"
                   >
                     {language === 'zh' ? '返回列表' : 'Back to List'}
                   </button>
@@ -533,7 +626,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       value={editingProject.title || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, title: e.target.value })}
                       placeholder="e.g. 摄影视觉展 / Photography Exhibition"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-sans font-medium"
                     />
                   </div>
 
@@ -547,7 +640,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       value={editingProject.subtitle || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, subtitle: e.target.value })}
                       placeholder="e.g. VISUAL EXHIBITION 2026"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-mono"
                     />
                   </div>
 
@@ -558,8 +651,21 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                     </label>
                     <select
                       value={editingProject.category || 'branding'}
-                      onChange={(e) => setEditingProject({ ...editingProject, category: e.target.value as WorkCategory })}
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      onChange={(e) => {
+                        const val = e.target.value as WorkCategory;
+                        const labels: Record<string, string> = {
+                          branding: 'BRANDING',
+                          type: 'TYPE',
+                          packaging: 'PACKAGING',
+                          exhibition: 'EXHIBITION'
+                        };
+                        setEditingProject({
+                          ...editingProject,
+                          category: val,
+                          categoryLabel: labels[val] || val.toUpperCase()
+                        });
+                      }}
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-sans"
                     >
                       <option value="branding">BRANDING / 品牌 VI</option>
                       <option value="type">TYPE / 字体排版</option>
@@ -578,12 +684,12 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       value={editingProject.year || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, year: e.target.value })}
                       placeholder="2026"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-mono"
                     />
                   </div>
 
                   {/* Client */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 sm:col-span-2">
                     <label className="text-xs font-mono text-gray-600 dark:text-neutral-400">
                       {language === 'zh' ? '客户 / 机构' : 'Client'}
                     </label>
@@ -592,20 +698,16 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       value={editingProject.client || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, client: e.target.value })}
                       placeholder="QSi Art Gallery"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-sans"
                     />
                   </div>
 
-                  {/* Card Number / Suit */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-mono text-gray-600 dark:text-neutral-400">
-                      {language === 'zh' ? '扑克牌卡号 (e.g. A♠, K♥)' : 'Card Number'}
-                    </label>
-                    <input
-                      type="text"
-                      value={editingProject.cardNumber || 'A♠'}
-                      onChange={(e) => setEditingProject({ ...editingProject, cardNumber: e.target.value })}
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-mono"
+                  {/* Color Palette Editor (REQUIREMENT 5) */}
+                  <div className="space-y-1 sm:col-span-2 bg-gray-50/80 dark:bg-neutral-950/80 p-3.5 border border-gray-200 dark:border-neutral-800 rounded-xl">
+                    <ColorPaletteEditor
+                      colors={editingProject.colorPalette || ['#18181b', '#3f3f46', '#71717a', '#a1a1aa', '#e4e4e7']}
+                      onChange={(newColors) => setEditingProject({ ...editingProject, colorPalette: newColors })}
+                      language={language}
                     />
                   </div>
 
@@ -624,7 +726,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       value={editingProject.coverImage || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, coverImage: e.target.value })}
                       placeholder="https://images.unsplash.com/photo-..."
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-xs font-mono bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
                     />
 
                     {/* Cover Large Preview Box */}
@@ -712,7 +814,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                       value={editingProject.summary || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, summary: e.target.value })}
                       placeholder="e.g. 探索光影与空间的沉浸式现代摄影艺术展览"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-sans"
                     />
                   </div>
 
@@ -731,7 +833,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                         })
                       }
                       placeholder="输入详细描述..."
-                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
+                      className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white font-sans"
                     />
                   </div>
 
@@ -755,28 +857,64 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-neutral-800">
-                  {editingProject.id && draftProjects.some((p) => p.id === editingProject.id) ? (
+                {/* Form Bottom Action Row */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-100 dark:border-neutral-800">
+                  {editingProject.id ? (
+                    showFormDeleteConfirm ? (
+                      <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/80 p-2 rounded-lg border border-red-200 dark:border-red-800 animate-fadeIn">
+                        <span className="text-xs font-mono font-bold text-red-600 dark:text-red-400">
+                          {language === 'zh' ? '确定删除作品？' : 'Confirm Delete?'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleConfirmDeleteFromForm}
+                          className="px-3 py-1 text-xs font-mono font-bold bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          {language === 'zh' ? '确认删除' : 'Confirm'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playClickSound();
+                            setShowFormDeleteConfirm(false);
+                          }}
+                          className="px-3 py-1 text-xs font-mono bg-gray-200 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 rounded hover:bg-gray-300 transition-colors cursor-pointer"
+                        >
+                          {language === 'zh' ? '取消' : 'Cancel'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playClickSound();
+                          setShowFormDeleteConfirm(true);
+                        }}
+                        className="px-3.5 py-2 text-xs font-mono font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{language === 'zh' ? '删除此作品' : 'Delete Project'}</span>
+                      </button>
+                    )
+                  ) : <div />}
+
+                  <div className="flex items-center justify-end gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => {
                         playClickSound();
-                        if (window.confirm(language === 'zh' ? '确定要在草稿列表中删除此作品吗？' : 'Delete this project from draft list?')) {
-                          const updated = draftProjects.filter((p) => p.id !== editingProject.id);
-                          pushToDraft(updated);
-                          showToast(language === 'zh' ? '作品已从列表中移除！' : 'Project deleted!');
-                          setEditingProject(null);
-                          setActiveTab('list');
+                        if (initialEditFormRef.current) {
+                          setEditingProject(JSON.parse(JSON.stringify(initialEditFormRef.current)));
+                          showToast(language === 'zh' ? '已撤销当前作品编辑，还原初始信息' : 'Form edits undone');
                         }
                       }}
-                      className="px-3.5 py-2 text-xs font-mono font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                      disabled={!initialEditFormRef.current || JSON.stringify(editingProject) === JSON.stringify(initialEditFormRef.current)}
+                      className="px-3 py-2 text-xs font-mono text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white border border-gray-200 dark:border-neutral-700 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1 cursor-pointer font-medium"
+                      title={language === 'zh' ? '撤销当前表单的修改' : 'Undo form edits'}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{language === 'zh' ? '删除此作品' : 'Delete Project'}</span>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{language === 'zh' ? '撤销修改' : 'Undo Edits'}</span>
                     </button>
-                  ) : <div />}
-
-                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -784,15 +922,16 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                         setEditingProject(null);
                         setActiveTab('list');
                       }}
-                      className="px-4 py-2 text-xs font-mono text-gray-600 dark:text-neutral-400 hover:text-black dark:hover:text-white"
+                      className="px-3.5 py-2 text-xs font-mono text-gray-600 dark:text-neutral-400 hover:text-black dark:hover:text-white cursor-pointer"
                     >
                       {language === 'zh' ? '取消' : 'Cancel'}
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity"
+                      className="px-5 py-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      {language === 'zh' ? '保存至草稿列表' : 'Save to Draft List'}
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{language === 'zh' ? '保存作品修改' : 'Save Project'}</span>
                     </button>
                   </div>
                 </div>
@@ -812,7 +951,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                     <button
                       type="button"
                       onClick={handleCopyJson}
-                      className="px-3 py-1.5 text-xs font-mono bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 text-xs font-mono bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                     >
                       {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copied ? (language === 'zh' ? '已复制' : 'Copied') : (language === 'zh' ? '复制 JSON' : 'Copy JSON')}</span>
@@ -841,7 +980,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                   <button
                     type="button"
                     onClick={handleApplyJson}
-                    className="px-5 py-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5"
+                    className="px-5 py-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>{language === 'zh' ? '解析并替换列表' : 'Apply & Replace List'}</span>
@@ -886,21 +1025,21 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowExitConfirm(false)}
-                    className="w-full sm:w-auto px-4 py-2 text-xs font-mono text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors text-center"
+                    className="w-full sm:w-auto px-4 py-2 text-xs font-mono text-gray-600 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors text-center cursor-pointer"
                   >
                     {language === 'zh' ? '取消并继续编辑' : 'Cancel & Keep Editing'}
                   </button>
                   <button
                     type="button"
                     onClick={handleDiscardAndExit}
-                    className="w-full sm:w-auto px-4 py-2 text-xs font-mono text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-center"
+                    className="w-full sm:w-auto px-4 py-2 text-xs font-mono text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors text-center cursor-pointer"
                   >
                     {language === 'zh' ? '不保存直接退出' : 'Discard & Exit'}
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirmSaveAndExit}
-                    className="w-full sm:w-auto px-4 py-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity text-center shadow-xs"
+                    className="w-full sm:w-auto px-4 py-2 text-xs font-mono font-bold bg-black text-white dark:bg-white dark:text-black rounded-lg hover:opacity-90 transition-opacity text-center shadow-xs cursor-pointer"
                   >
                     {language === 'zh' ? '确认修改并保存' : 'Save & Confirm'}
                   </button>
