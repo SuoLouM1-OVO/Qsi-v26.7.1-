@@ -247,18 +247,18 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* EXPANDED UNIFIED SEARCH LAYER (Integrates Search Button into the SAME card surface) */}
+          {/* EXPANDED UNIFIED SEARCH LAYER (Centered on screen without overflowing viewport) */}
           <AnimatePresence>
             {isSearchOpen && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: -4, x: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: -4, x: 10 }}
+                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -4 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 30, mass: 0.8 }}
-                style={{ transformOrigin: 'top right' }}
-                className="absolute top-0 right-0 z-50 w-[320px] sm:w-[420px] bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border border-gray-200 dark:border-neutral-800 shadow-2xl rounded-2xl p-3.5 overflow-hidden"
+                style={{ transformOrigin: 'top center' }}
+                className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-24px)] max-w-[440px] bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border border-gray-200 dark:border-neutral-800 shadow-2xl rounded-2xl p-3.5 overflow-hidden"
               >
-                {/* Search Input Bar with Embedded Search Button Icon & Close Button */}
+                {/* Search Input Bar */}
                 <div className="flex items-center gap-2 pb-2.5 border-b border-gray-100 dark:border-neutral-800">
                   <div className="h-7 w-7 flex items-center justify-center rounded-full bg-black/5 dark:bg-white/10 text-black dark:text-white shrink-0">
                     <Search className="w-3.5 h-3.5 stroke-[2]" />
@@ -286,29 +286,17 @@ export const Header: React.FC<HeaderProps> = ({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  {/* Fold Search button inside the same card layer */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (searchQuery.trim()) saveSearchTerm(searchQuery);
-                      onOpenSearch();
-                    }}
-                    className="h-7 w-7 flex items-center justify-center rounded-full bg-black text-white dark:bg-white dark:text-black shrink-0 hover:scale-105 active:scale-95 transition-all shadow-xs"
-                    title={language === 'zh' ? '折叠搜索栏' : 'Fold Search'}
-                  >
-                    <X className="w-3.5 h-3.5 stroke-[2]" />
-                  </button>
                 </div>
 
-                {/* Downward Expanded Area: Hot Tags, Local History, and Search Results */}
-                <div className="pt-3 space-y-3.5 max-h-[65vh] overflow-y-auto">
-                  {/* Section 1: Hot Popular Tags */}
-                  <div className="space-y-1.5">
+                {/* Downward Area: Hot Tags (1 Row), Search History (1 Row), and Results */}
+                <div className="pt-3 space-y-3 max-h-[60vh] overflow-y-auto">
+                  {/* Section 1: Hot Popular Tags (1 Row) */}
+                  <div className="space-y-1">
                     <div className="flex items-center gap-1.5 text-[10px] font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-widest pl-0.5">
-                      <Sparkles className="w-3 h-3 text-amber-500" />
-                      <span>{language === 'zh' ? '热门推荐搜索' : 'POPULAR TAGS'}</span>
+                      <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                      <span>{language === 'zh' ? '热门推荐' : 'RECOMMENDED'}</span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
                       {HOT_TAGS.map((tag) => (
                         <button
                           type="button"
@@ -317,28 +305,28 @@ export const Header: React.FC<HeaderProps> = ({
                             setSearchQuery(tag);
                             saveSearchTerm(tag);
                           }}
-                          className="px-2.5 py-1 text-[11px] font-mono bg-gray-100 dark:bg-neutral-800/80 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-gray-700 dark:text-neutral-300 rounded-lg transition-all flex items-center gap-1 active:scale-95"
+                          className="px-2.5 py-1 text-[11px] font-mono whitespace-nowrap shrink-0 bg-gray-100 dark:bg-neutral-800 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-gray-700 dark:text-neutral-300 rounded-lg transition-all flex items-center gap-1 active:scale-95"
                         >
-                          <Tag className="w-3 h-3 opacity-60" />
+                          <Tag className="w-3 h-3 opacity-60 shrink-0" />
                           <span>{tag}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Section 2: Local Search History */}
-                  <div className="space-y-1.5 pt-1 border-t border-gray-100 dark:border-neutral-800/60">
+                  {/* Section 2: Local Search History (1 Row) */}
+                  <div className="space-y-1 pt-1 border-t border-gray-100 dark:border-neutral-800/60">
                     <div className="flex items-center justify-between text-[10px] font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-widest pl-0.5">
                       <div className="flex items-center gap-1.5">
-                        <History className="w-3 h-3" />
-                        <span>{language === 'zh' ? '本地搜索历史' : 'RECENT SEARCHES'}</span>
+                        <History className="w-3 h-3 shrink-0" />
+                        <span>{language === 'zh' ? '搜索记录' : 'RECENT SEARCHES'}</span>
                       </div>
                       {searchHistory.length > 0 && (
                         <button
                           type="button"
                           onClick={clearSearchHistory}
-                          className="text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1 text-[10px]"
-                          title="清空全部搜索历史"
+                          className="text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1 text-[10px] shrink-0"
+                          title="清空搜索记录"
                         >
                           <Trash2 className="w-3 h-3" />
                           <span>{language === 'zh' ? '清空' : 'Clear'}</span>
@@ -348,10 +336,10 @@ export const Header: React.FC<HeaderProps> = ({
 
                     {searchHistory.length === 0 ? (
                       <p className="text-[11px] font-mono text-gray-400 dark:text-neutral-600 italic px-1 py-0.5">
-                        {language === 'zh' ? '暂无搜索历史记录' : 'No search history recorded'}
+                        {language === 'zh' ? '暂无搜索记录' : 'No search history'}
                       </p>
                     ) : (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
                         {searchHistory.map((term) => (
                           <button
                             type="button"
@@ -360,7 +348,7 @@ export const Header: React.FC<HeaderProps> = ({
                               setSearchQuery(term);
                               saveSearchTerm(term);
                             }}
-                            className="px-2.5 py-1 text-[11px] font-mono bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-neutral-400 hover:border-black dark:hover:border-white hover:text-black dark:hover:text-white rounded-lg transition-all active:scale-95"
+                            className="px-2.5 py-1 text-[11px] font-mono whitespace-nowrap shrink-0 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 text-gray-600 dark:text-neutral-400 hover:border-black dark:hover:border-white hover:text-black dark:hover:text-white rounded-lg transition-all active:scale-95"
                           >
                             {term}
                           </button>
@@ -430,7 +418,7 @@ export const Header: React.FC<HeaderProps> = ({
                 exit={{ opacity: 0, scale: 0.95, y: 6 }}
                 transition={{ type: 'spring', stiffness: 450, damping: 30, mass: 0.8 }}
                 style={{ transformOrigin: 'top right' }}
-                className="absolute top-full right-0 mt-2 z-50 w-64 sm:w-72 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border border-gray-200 dark:border-neutral-800 shadow-2xl rounded-2xl p-3.5 overflow-hidden"
+                className="absolute top-full right-0 mt-2 z-50 w-[calc(100vw-24px)] max-w-[280px] sm:w-72 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xl border border-gray-200 dark:border-neutral-800 shadow-2xl rounded-2xl p-3.5 overflow-hidden"
               >
                 <div className="flex items-center gap-2 pb-2.5 mb-2 border-b border-gray-100 dark:border-neutral-800">
                   <Sparkles className="w-3.5 h-3.5 text-black dark:text-white ml-1" />

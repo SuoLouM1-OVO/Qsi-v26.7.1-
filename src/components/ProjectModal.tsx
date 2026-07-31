@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { X, ArrowLeft, ArrowRight, Edit3, Trash2 } from 'lucide-react';
 import { Project, Language } from '../types';
 import { FourPointStar } from './FourPointStar';
 
@@ -13,6 +13,8 @@ interface ProjectModalProps {
   likesMap: Record<string, number>;
   onIncrementLike: (projectId: string) => void;
   language?: Language;
+  onEditProject?: (project: Project) => void;
+  onDeleteProject?: (projectId: string) => void;
 }
 
 export const ProjectModal: React.FC<ProjectModalProps> = ({
@@ -23,7 +25,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   playClickSound,
   likesMap,
   onIncrementLike,
-  language = 'zh'
+  language = 'zh',
+  onEditProject,
+  onDeleteProject
 }) => {
   const [sparkleAnim, setSparkleAnim] = useState(false);
 
@@ -51,15 +55,15 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="bg-white dark:bg-neutral-900 w-full max-w-4xl shadow-2xl border border-black dark:border-neutral-700 rounded-2xl overflow-hidden relative my-auto max-h-[90vh] flex flex-col transition-colors"
+          className="bg-white dark:bg-neutral-900 w-full max-w-[95vw] sm:max-w-4xl shadow-2xl border border-gray-200 dark:border-neutral-800 rounded-xl sm:rounded-2xl overflow-hidden relative my-auto max-h-[88vh] sm:max-h-[90vh] flex flex-col transition-colors"
         >
           {/* TOP FIXED MODAL BAR */}
-          <div className="sticky top-0 z-20 bg-white dark:bg-neutral-900 px-6 py-4 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="sticky top-0 z-20 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md px-3.5 sm:px-6 py-2.5 sm:py-4 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {/* Star Like Increment Button */}
               <button
                 onClick={handleLikeClick}
-                className="relative flex items-center gap-1.5 px-3 py-1 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-black dark:text-white border border-gray-200 dark:border-neutral-700 text-xs font-mono font-semibold rounded-full transition-all active:scale-95"
+                className="relative flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 text-black dark:text-white border border-gray-200 dark:border-neutral-700 text-xs font-mono font-semibold rounded-full transition-all active:scale-95"
                 title={language === 'zh' ? '点赞 +1' : 'Like +1'}
               >
                 <FourPointStar className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
@@ -72,18 +76,47 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                 )}
               </button>
 
-              <span className="text-xs font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-widest hidden sm:inline">
+              <span className="text-[11px] font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-wider hidden sm:inline">
                 {project.index} • {project.categoryLabel}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {onEditProject && (
+                <button
+                  onClick={() => {
+                    playClickSound();
+                    onEditProject(project);
+                  }}
+                  className="p-1.5 sm:p-2 text-gray-600 dark:text-neutral-300 hover:text-black dark:hover:text-white bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title={language === 'zh' ? '编辑此作品' : 'Edit Project'}
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+              )}
+
+              {onDeleteProject && (
+                <button
+                  onClick={() => {
+                    playClickSound();
+                    if (window.confirm(language === 'zh' ? '确定要删除此作品吗？' : 'Are you sure you want to delete this project?')) {
+                      onDeleteProject(project.id);
+                      onClose();
+                    }
+                  }}
+                  className="p-1.5 sm:p-2 text-gray-400 hover:text-red-500 bg-gray-100 dark:bg-neutral-800 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-colors flex items-center justify-center shrink-0"
+                  title={language === 'zh' ? '删除此作品' : 'Delete Project'}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   playClickSound();
                   onPrev();
                 }}
-                className="p-2 text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-full transition-colors"
+                className="p-1.5 sm:p-2 text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-full transition-colors"
                 title={language === 'zh' ? '上一个作品' : 'Previous Project'}
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -94,7 +127,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   playClickSound();
                   onNext();
                 }}
-                className="p-2 text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-full transition-colors"
+                className="p-1.5 sm:p-2 text-gray-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-full transition-colors"
                 title={language === 'zh' ? '下一个作品' : 'Next Project'}
               >
                 <ArrowRight className="w-4 h-4" />
@@ -105,7 +138,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   playClickSound();
                   onClose();
                 }}
-                className="p-2 bg-black dark:bg-white text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-full transition-colors ml-2"
+                className="p-1.5 sm:p-2 bg-black dark:bg-white text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-full transition-colors ml-1 sm:ml-2"
                 title={language === 'zh' ? '关闭' : 'Close'}
               >
                 <X className="w-4 h-4" />
@@ -114,19 +147,19 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           </div>
 
           {/* SCROLLABLE BODY */}
-          <div className="overflow-y-auto p-6 sm:p-10 space-y-8">
+          <div className="overflow-y-auto p-4 sm:p-8 space-y-5 sm:space-y-8">
             
             {/* Title & Metadata */}
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               <span className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 tracking-[0.2em] uppercase block">
                 {project.year} • {project.client}
               </span>
               
-              <h2 className="text-2xl sm:text-4xl font-light text-black dark:text-white leading-tight font-sans">
+              <h2 className="text-xl sm:text-3xl font-light text-black dark:text-white leading-tight font-sans">
                 {primaryTitle}
               </h2>
               
-              <p className="text-xs sm:text-sm font-mono text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
+              <p className="text-xs font-mono text-gray-500 dark:text-neutral-400 uppercase tracking-wider">
                 {secondarySubtitle}
               </p>
             </div>

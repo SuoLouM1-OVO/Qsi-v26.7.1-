@@ -2,7 +2,7 @@ export type TabType = 'home' | 'about' | 'works';
 
 export type Language = 'zh' | 'en';
 
-export type WorkCategory = 'all' | 'branding' | 'type' | 'packaging' | 'exhibition';
+export type WorkCategory = 'all' | 'branding' | 'type' | 'packaging' | 'exhibition' | (string & {});
 
 export interface Project {
   id: string;

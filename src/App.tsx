@@ -10,9 +10,10 @@ import { HomeTab } from './components/HomeTab';
 import { AboutTab } from './components/AboutTab';
 import { WorksTab } from './components/WorksTab';
 import { ProjectModal } from './components/ProjectModal';
+import { ProjectManagerModal } from './components/ProjectManagerModal';
 import { CustomCursor } from './components/CustomCursor';
 import { IntroLoader } from './components/IntroLoader';
-import { PROJECTS } from './data/portfolioData';
+import { PROJECTS as INITIAL_DEFAULT_PROJECTS } from './data/portfolioData';
 import { TabType, Project, Language } from './types';
 import { soundSynth } from './utils/sound';
 
@@ -22,6 +23,41 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [language, setLanguage] = useState<Language>('zh');
   const [isIntroReady, setIsIntroReady] = useState(false);
+
+  // Dynamic Portfolio Projects State (Loaded from localStorage or default dataset)
+  const [projects, setProjects] = useState<Project[]>(() => {
+    const saved = localStorage.getItem('qsi_custom_projects');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        // Fallback to initial default projects
+      }
+    }
+    return INITIAL_DEFAULT_PROJECTS;
+  });
+
+  const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
+  const [managerEditProject, setManagerEditProject] = useState<Project | null>(null);
+
+  const handleSaveProjects = (newProjects: Project[]) => {
+    setProjects(newProjects);
+    try {
+      localStorage.setItem('qsi_custom_projects', JSON.stringify(newProjects));
+    } catch (e) {
+      // ignore quota or storage error
+    }
+  };
+
+  const handleResetProjects = () => {
+    setProjects(INITIAL_DEFAULT_PROJECTS);
+    try {
+      localStorage.removeItem('qsi_custom_projects');
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Dark Mode / Night Reading Mode State
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -71,13 +107,13 @@ export default function App() {
   // Calculate current effective likes map
   const likesMap = React.useMemo(() => {
     const map: Record<string, number> = {};
-    PROJECTS.forEach((p) => {
+    projects.forEach((p) => {
       const base = typeof p.likes === 'number' ? p.likes : 12;
       const delta = userLikeDeltas[p.id] || 0;
       map[p.id] = base + delta;
     });
     return map;
-  }, [userLikeDeltas]);
+  }, [projects, userLikeDeltas]);
 
   const handleIncrementLike = (projectId: string) => {
     setUserLikeDeltas((prev) => {
@@ -138,16 +174,16 @@ export default function App() {
   // Handle next / prev project in modal
   const handleNextProject = () => {
     if (!selectedProject) return;
-    const currentIdx = PROJECTS.findIndex((p) => p.id === selectedProject.id);
-    const nextIdx = (currentIdx + 1) % PROJECTS.length;
-    setSelectedProject(PROJECTS[nextIdx]);
+    const currentIdx = projects.findIndex((p) => p.id === selectedProject.id);
+    const nextIdx = (currentIdx + 1) % projects.length;
+    setSelectedProject(projects[nextIdx]);
   };
 
   const handlePrevProject = () => {
     if (!selectedProject) return;
-    const currentIdx = PROJECTS.findIndex((p) => p.id === selectedProject.id);
-    const prevIdx = (currentIdx - 1 + PROJECTS.length) % PROJECTS.length;
-    setSelectedProject(PROJECTS[prevIdx]);
+    const currentIdx = projects.findIndex((p) => p.id === selectedProject.id);
+    const prevIdx = (currentIdx - 1 + projects.length) % projects.length;
+    setSelectedProject(projects[prevIdx]);
   };
 
   return (
@@ -171,12 +207,12 @@ export default function App() {
           playClickSound();
           setSearchOpen(!searchOpen);
         }}
-        projectCount={PROJECTS.length}
+        projectCount={projects.length}
         language={language}
         setLanguage={setLanguage}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
-        projects={PROJECTS}
+        projects={projects}
         onSelectProject={(project) => {
           setSelectedProject(project);
           playClickSound();
@@ -208,7 +244,7 @@ export default function App() {
         {/* WORKS SECTION */}
         <section id="works" className="relative z-10 scroll-mt-20">
           <WorksTab
-            projects={PROJECTS}
+            projects={projects}
             onSelectProject={(project) => {
               playClickSound();
               setSelectedProject(project);
@@ -217,6 +253,10 @@ export default function App() {
             likesMap={likesMap}
             onIncrementLike={handleIncrementLike}
             language={language}
+            onOpenProjectManager={() => {
+              setManagerEditProject(null);
+              setIsProjectManagerOpen(true);
+            }}
           />
         </section>
       </main>
@@ -237,6 +277,32 @@ export default function App() {
         playClickSound={playClickSound}
         likesMap={likesMap}
         onIncrementLike={handleIncrementLike}
+        language={language}
+        onEditProject={(proj) => {
+          setSelectedProject(null);
+          setManagerEditProject(proj);
+          setIsProjectManagerOpen(true);
+        }}
+        onDeleteProject={(projectId) => {
+          const updated = projects.filter((p) => p.id !== projectId);
+          handleSaveProjects(updated);
+          setSelectedProject(null);
+        }}
+      />
+
+      {/* PROJECT MANAGER & REPLACE MODAL */}
+      <ProjectManagerModal
+        isOpen={isProjectManagerOpen}
+        onClose={() => {
+          setIsProjectManagerOpen(false);
+          setManagerEditProject(null);
+        }}
+        projects={projects}
+        onSaveProjects={handleSaveProjects}
+        onResetProjects={handleResetProjects}
+        playClickSound={playClickSound}
+        language={language}
+        initialEditProject={managerEditProject}
       />
 
       {/* INITIALIZATION INTRO LOADER */}

@@ -12,7 +12,7 @@ export const PROJECTS: Project[] = [
     year: '2026',
     index: '01/16',
     client: 'Masai Photography Art Foundation',
-    coverImage: 'https://i.pinimg.com/736x/78/cb/4d/78cb4ddb73065348eb902584821acd94.jpg',
+    coverImage: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80',
@@ -26,7 +26,7 @@ export const PROJECTS: Project[] = [
     tags: ['主视觉设计', '展陈排版', '黑白摄影', '海报设计'],
     colorPalette: ['#121212', '#2A2A2A', '#8C8C8C', '#EAEAEA', '#FFFFFF'],
     featured: true,
-    likes:12
+    likes: 128
   },
   {
     id: 'tiger-ceramic',
@@ -39,7 +39,7 @@ export const PROJECTS: Project[] = [
     year: '2025',
     index: '02/16',
     client: '景德镇当代陶瓷艺术馆',
-    coverImage: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1525909002-1b05e0c869d8?auto=format&fit=crop&w=1200&q=80',
@@ -53,11 +53,11 @@ export const PROJECTS: Project[] = [
     tags: ['书籍装帧', '排版艺术', '特种纸', '陶瓷文化'],
     colorPalette: ['#3A322C', '#6E5D4F', '#A39382', '#D1C8BD', '#F7F4EF'],
     featured: true,
-    likes: 0
+    likes: 86
   },
   {
     id: 'lin-fengmian-grad',
-    cardNumber: '',
+    cardNumber: '3♣',
     suit: 'club',
     title: '林風眠美術學院畢業展 主視覺',
     subtitle: 'LIN FENGMIAN GRADUATION EXHIBITION',
@@ -66,7 +66,7 @@ export const PROJECTS: Project[] = [
     year: '2025',
     index: '03/16',
     client: '林风眠美术学院',
-    coverImage: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80'
@@ -92,7 +92,7 @@ export const PROJECTS: Project[] = [
     year: '2025',
     index: '04/16',
     client: '强力草本健康科技',
-    coverImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=1200&q=80'
@@ -118,7 +118,7 @@ export const PROJECTS: Project[] = [
     year: '2024',
     index: '05/16',
     client: 'OR Architecture & Design',
-    coverImage: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80'
@@ -139,12 +139,12 @@ export const PROJECTS: Project[] = [
     suit: 'diamond',
     title: 'COF2E2 咖啡品牌形象設計',
     subtitle: 'COF2E2 COFFEE BRAND',
-    category: 'branding',
-    categoryLabel: 'BRANDING / PACKAGING',
+    category: 'packaging',
+    categoryLabel: 'PACKAGING / BRANDING',
     year: '2024',
     index: '06/16',
     client: 'COF2E2 Roastery',
-    coverImage: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=1200&q=80'
@@ -170,7 +170,7 @@ export const PROJECTS: Project[] = [
     year: '2025',
     index: '07/16',
     client: 'YUTOO Creative Lab',
-    coverImage: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1512909006721-3d6018887383?auto=format&fit=crop&w=1200&q=80',
       'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1200&q=80'
@@ -196,7 +196,7 @@ export const PROJECTS: Project[] = [
     year: '2025',
     index: '08/16',
     client: 'Design Monthly China',
-    coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'
     ],
@@ -220,7 +220,7 @@ export const PROJECTS: Project[] = [
     year: '2024',
     index: '09/16',
     client: 'Urban Space Lab',
-    coverImage: 'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=1200&q=80'
     ],
@@ -244,7 +244,7 @@ export const PROJECTS: Project[] = [
     year: '2024',
     index: '10/16',
     client: '草木言出版工作室',
-    coverImage: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80'
     ],
@@ -268,7 +268,7 @@ export const PROJECTS: Project[] = [
     year: '2024',
     index: '11/16',
     client: 'FIL Design Collective',
-    coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'
     ],
@@ -287,12 +287,12 @@ export const PROJECTS: Project[] = [
     suit: 'heart',
     title: 'RED LAUNCH Bloom Bazaar 品牌',
     subtitle: 'RED LAUNCH BLOOM BAZAAR',
-    category: 'branding',
-    categoryLabel: 'BRANDING / PACKAGING',
+    category: 'packaging',
+    categoryLabel: 'PACKAGING / BRANDING',
     year: '2024',
     index: '12/16',
     client: 'RED Launch 集市',
-    coverImage: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
       'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80'
     ],
@@ -306,19 +306,98 @@ export const PROJECTS: Project[] = [
     likes: 680
   },
   {
-    id: 'poster-archive-2023',
-    cardNumber: '3♠',
+    id: 'morpheus-perfume',
+    cardNumber: 'K♠',
     suit: 'spade',
+    title: 'MORPHEUS 墨菲斯香氛包装设计',
+    subtitle: 'MORPHEUS FRAGRANCE PACKAGING',
+    category: 'packaging',
+    categoryLabel: 'PACKAGING / TYPE',
+    year: '2025',
+    index: '13/16',
+    client: 'Morpheus Atelier Paris',
+    coverImage: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=1200&q=80',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&w=1200&q=80'
+    ],
+    summary: '深邃暗黑玻璃瓶体与银箔触感纸盒，呈现如梦境沉溺般的感官香氛包装。',
+    description: [
+      '墨菲斯香氛（Morpheus）以梦境神祇为灵感。视觉设计融合黑不锈钢压纹瓶盖与特种质感砂磨盒，封口处打凹哑光银箔印记。',
+      '字型排版追求极度洗练的罗马体雕刻感，呈现典雅与前卫并存的奢侈香气体验。'
+    ],
+    tags: ['香氛包装', '奢品视觉', '打凹烫银', '暗黑美学'],
+    colorPalette: ['#0A0A0A', '#1C1C1E', '#3A3A3C', '#C0C0C0', '#F2F2F7'],
+    featured: true,
+    likes: 430
+  },
+  {
+    id: 'minimal-grid-poster',
+    cardNumber: 'A♥',
+    suit: 'heart',
+    title: '极简网格海报与字体解构',
+    subtitle: 'GRID TYPOGRAPHY & DECONSTRUCTION',
+    category: 'type',
+    categoryLabel: 'TYPE / EDITORIAL',
+    year: '2025',
+    index: '14/16',
+    client: 'Swiss Style Graphic Society',
+    coverImage: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=1200&q=80',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1200&q=80'
+    ],
+    summary: '瑞士平面派国际网格的当代转译，用严谨对齐与错位撕裂探索排版张力。',
+    description: [
+      '以经典瑞士国际平面设计风格（International Typographic Style）为基础，通过数学比率网格控制文字编排，并在局部引入物理撕裂与扫描拉伸纹路。',
+      '展现理性逻辑与非理性情绪的戏剧化撕扯。'
+    ],
+    tags: ['瑞士排版', '网格系统', '海报设计', '字体解构'],
+    colorPalette: ['#111111', '#E11D48', '#52525B', '#E4E4E7', '#FAFAFA'],
+    featured: true,
+    likes: 312
+  },
+  {
+    id: 'zen-tea-identity',
+    cardNumber: '2♣',
+    suit: 'club',
+    title: '《一叶禅》东方茶饮VI系统',
+    subtitle: 'ZEN TEA BRAND IDENTITY',
+    category: 'branding',
+    categoryLabel: 'BRANDING / TYPE',
+    year: '2025',
+    index: '15/16',
+    client: '一叶禅茶文化',
+    coverImage: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1531972111231-7482a960e109?auto=format&fit=crop&w=1200&q=80'
+    ],
+    summary: '一叶落而知天下秋，融合天然茶渍染与木刻刷印的东方哲思形象。',
+    description: [
+      '“一叶禅”将传统茶道融入日常都市生活。品牌标志由单一线条的茶叶轮廓演化而成，辅以高品质手工制宣纸名片与茶罐封装。',
+      '色彩汲取高山乌龙茶汤色与深山苔藓绿，传递虚静空灵的气味记忆。'
+    ],
+    tags: ['茶品牌识别', '东方美学', '茶包装', '特种纸工艺'],
+    colorPalette: ['#1B2E1E', '#3D523B', '#8C9A86', '#D1DACD', '#F4F7F3'],
+    featured: true,
+    likes: 520
+  },
+  {
+    id: 'poster-archive-2023',
+    cardNumber: '3♦',
+    suit: 'diamond',
     title: '齐思 海报创作档案 2020-2026',
     subtitle: 'QISI POSTER ARCHIVE',
     category: 'exhibition',
     categoryLabel: 'EXHIBITION / TYPE',
     year: '2026',
-    index: '13/13',
+    index: '16/16',
     client: 'QSi Personal Archive',
-    coverImage: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1200&q=80',
     galleryImages: [
-      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1200&q=80'
+      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80'
     ],
     summary: '6年间120+张实验海报的精选整理，记录视觉语言的演进轨道。',
     description: [
