@@ -13,10 +13,13 @@ import {
   Image as ImageIcon,
   Undo,
   Eye,
-  Save
+  Save,
+  Upload,
+  Zap
 } from 'lucide-react';
 import { Project, WorkCategory, Language } from '../types';
 import { ColorPaletteEditor } from './ColorPaletteEditor';
+import { compressImageFile, formatFileSize } from '../utils/imageCompressor';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -47,6 +50,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [compressNotice, setCompressNotice] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showFormDeleteConfirm, setShowFormDeleteConfirm] = useState(false);
 
@@ -711,21 +715,73 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                     />
                   </div>
 
+                  {/* Compression Status Notice */}
+                  {compressNotice && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      className="sm:col-span-2 p-2.5 bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800/80 rounded-xl flex items-center justify-between text-xs font-mono text-blue-800 dark:text-blue-300"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 animate-pulse" />
+                        <span>{compressNotice}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCompressNotice(null)}
+                        className="text-blue-400 hover:text-blue-600 dark:hover:text-white p-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </motion.div>
+                  )}
+
                   {/* Cover Image */}
                   <div className="space-y-2 sm:col-span-2">
-                    <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 flex items-center justify-between">
-                      <span className="font-bold text-black dark:text-white flex items-center gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center gap-1.5">
                         <ImageIcon className="w-3.5 h-3.5" />
-                        {language === 'zh' ? '封面图片 URL *' : 'Cover Image URL *'}
-                      </span>
-                      <span className="text-[10px] text-gray-400">(Unsplash / Pinterest / 任何外链图片)</span>
-                    </label>
+                        {language === 'zh' ? '封面图片 *' : 'Cover Image *'}
+                      </label>
+                      <label className="cursor-pointer text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 shrink-0">
+                        <Upload className="w-3 h-3" />
+                        <span>{language === 'zh' ? '📱 手机选择图片 (自动压缩+云同步Ready)' : '📱 Auto-Compress Upload'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setCompressNotice(language === 'zh' ? '⚡ 正在处理并高清压缩图片...' : '⚡ Compressing image...');
+                              try {
+                                const res = await compressImageFile(file);
+                                setEditingProject((prev) => ({
+                                  ...prev,
+                                  coverImage: res.dataUrl
+                                }));
+                                setCompressNotice(
+                                  language === 'zh'
+                                    ? `⚡ 图片已自动优化 (${formatFileSize(res.originalSize)} ➔ ${formatFileSize(res.compressedSize)}, 体积缩小 ${res.compressionRatio}%)，线上同步保真！`
+                                    : `⚡ Compressed (${formatFileSize(res.originalSize)} ➔ ${formatFileSize(res.compressedSize)}, -${res.compressionRatio}%)`
+                                );
+                              } catch (err) {
+                                console.error(err);
+                                setCompressNotice(language === 'zh' ? '❌ 图片压缩处理失败' : '❌ Compression failed');
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
                     <input
-                      type="url"
+                      type="text"
                       required
                       value={editingProject.coverImage || ''}
                       onChange={(e) => setEditingProject({ ...editingProject, coverImage: e.target.value })}
-                      placeholder="https://images.unsplash.com/photo-..."
+                      placeholder={language === 'zh' ? '贴入图片 URL 或点击上方上传手机图片' : 'Paste image URL or tap upload above'}
                       className="w-full px-3 py-2 text-xs font-mono bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
                     />
 
@@ -745,8 +801,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80';
                             }}
                           />
-                          <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-mono rounded-md">
-                            COVER PREVIEW
+                          <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-mono rounded-md flex items-center gap-1">
+                            <span>COVER PREVIEW</span>
                           </div>
                         </div>
                       </div>
@@ -755,10 +811,61 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
 
                   {/* Gallery Images */}
                   <div className="space-y-2 sm:col-span-2">
-                    <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center gap-1.5">
-                      <ImageIcon className="w-3.5 h-3.5" />
-                      {language === 'zh' ? '详情页图集 URL (每行一个)' : 'Gallery Images (One URL per line)'}
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        {language === 'zh' ? '详情页图集 (每行一个 URL)' : 'Gallery Images (One URL per line)'}
+                      </label>
+                      <label className="cursor-pointer text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0">
+                        <Upload className="w-3 h-3" />
+                        <span>{language === 'zh' ? '📱 手机批量选择图片 (自动压缩)' : '📱 Auto-Compress Gallery'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={async (e) => {
+                            const files = Array.from(e.target.files || []) as File[];
+                            if (files.length > 0) {
+                              setCompressNotice(
+                                language === 'zh'
+                                  ? `⚡ 正在并行压缩 ${files.length} 张图片...`
+                                  : `⚡ Compressing ${files.length} images...`
+                              );
+                              try {
+                                let totalOrig = 0;
+                                let totalComp = 0;
+                                const results = await Promise.all(
+                                  files.map(async (file: File) => {
+                                    const res = await compressImageFile(file);
+                                    totalOrig += res.originalSize;
+                                    totalComp += res.compressedSize;
+                                    return res.dataUrl;
+                                  })
+                                );
+                                setEditingProject((prev) => ({
+                                  ...prev,
+                                  galleryImages: [
+                                    ...(prev?.galleryImages || []),
+                                    ...results
+                                  ]
+                                }));
+                                const overallRatio = totalOrig > 0 ? Math.round(((totalOrig - totalComp) / totalOrig) * 100) : 0;
+                                setCompressNotice(
+                                  language === 'zh'
+                                    ? `⚡ 已压缩并导入 ${files.length} 张图片 (${formatFileSize(totalOrig)} ➔ ${formatFileSize(totalComp)}, 节省 ${overallRatio}%)！`
+                                    : `⚡ Compressed & added ${files.length} images!`
+                                );
+                              } catch (err) {
+                                console.error(err);
+                                setCompressNotice(language === 'zh' ? '❌ 部分图片压缩失败' : '❌ Compression error');
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+
                     <textarea
                       rows={3}
                       value={(editingProject.galleryImages || []).join('\n')}

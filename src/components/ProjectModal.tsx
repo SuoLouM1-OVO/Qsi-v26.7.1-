@@ -11,11 +11,14 @@ import {
   RotateCcw,
   ImageIcon,
   Eye,
-  Save
+  Save,
+  Upload,
+  Zap
 } from 'lucide-react';
 import { Project, Language, WorkCategory } from '../types';
 import { FourPointStar } from './FourPointStar';
 import { ColorPaletteEditor } from './ColorPaletteEditor';
+import { compressImageFile, formatFileSize } from '../utils/imageCompressor';
 
 interface ProjectModalProps {
   project: Project | null;
@@ -56,6 +59,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const initialFormRef = useRef<Partial<Project>>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [compressNotice, setCompressNotice] = useState<string | null>(null);
 
   // Sync edit form when project changes or edit mode toggled
   useEffect(() => {
@@ -359,17 +363,73 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   </div>
                 </div>
 
+                {/* Compression Status Notice */}
+                {compressNotice && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="p-2.5 bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800/80 rounded-xl flex items-center justify-between text-xs font-mono text-blue-800 dark:text-blue-300"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 animate-pulse" />
+                      <span>{compressNotice}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCompressNotice(null)}
+                      className="text-blue-400 hover:text-blue-600 dark:hover:text-white p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                )}
+
                 {/* Cover Image URL & Live Preview */}
                 <div className="space-y-2">
-                  <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    {language === 'zh' ? '主封面图片 URL *' : 'Cover Image URL *'}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      {language === 'zh' ? '主封面图片 *' : 'Cover Image *'}
+                    </label>
+                    <label className="cursor-pointer text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 shrink-0">
+                      <Upload className="w-3 h-3" />
+                      <span>{language === 'zh' ? '📱 手机选择图片 (自动压缩+云同步Ready)' : '📱 Auto-Compress Upload'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setCompressNotice(language === 'zh' ? '⚡ 正在处理并高清压缩图片...' : '⚡ Compressing image...');
+                            try {
+                              const res = await compressImageFile(file);
+                              setEditForm((prev) => ({
+                                ...prev,
+                                coverImage: res.dataUrl
+                              }));
+                              setCompressNotice(
+                                language === 'zh'
+                                  ? `⚡ 图片已自动优化 (${formatFileSize(res.originalSize)} ➔ ${formatFileSize(res.compressedSize)}, 体积缩小 ${res.compressionRatio}%)，线上同步保真！`
+                                  : `⚡ Compressed (${formatFileSize(res.originalSize)} ➔ ${formatFileSize(res.compressedSize)}, -${res.compressionRatio}%)`
+                              );
+                            } catch (err) {
+                              console.error(err);
+                              setCompressNotice(language === 'zh' ? '❌ 图片压缩处理失败' : '❌ Compression failed');
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   <input
-                    type="url"
+                    type="text"
                     required
                     value={editForm.coverImage || ''}
                     onChange={(e) => setEditForm({ ...editForm, coverImage: e.target.value })}
+                    placeholder={language === 'zh' ? '贴入图片 URL 或点击上方按钮上传手机图片' : 'Paste URL or tap button above to upload'}
                     className="w-full px-3 py-2 text-xs font-mono bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:border-black dark:focus:border-white"
                   />
                   <div className="aspect-16/9 overflow-hidden bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl relative group">
@@ -475,14 +535,66 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
                 {/* Gallery Images */}
                 <div className="space-y-2">
-                  <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center justify-between">
-                    <span>{language === 'zh' ? '图集图片 URL (每行一个)' : 'Gallery Images (One URL per line)'}</span>
-                    <span className="text-[10px] text-gray-400">{(editForm.galleryImages || []).length} {language === 'zh' ? '张图片' : 'images'}</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono text-gray-600 dark:text-neutral-400 font-bold text-black dark:text-white flex items-center justify-between">
+                      <span>{language === 'zh' ? '图集图片 (每行一个 URL)' : 'Gallery Images (One URL per line)'}</span>
+                      <span className="text-[10px] text-gray-400">{(editForm.galleryImages || []).length} {language === 'zh' ? '张图片' : 'images'}</span>
+                    </label>
+                    <label className="cursor-pointer text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 shrink-0">
+                      <Upload className="w-3 h-3" />
+                      <span>{language === 'zh' ? '📱 手机批量选择图片 (自动压缩)' : '📱 Auto-Compress Gallery'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []) as File[];
+                          if (files.length > 0) {
+                            setCompressNotice(
+                              language === 'zh'
+                                ? `⚡ 正在并行压缩 ${files.length} 张图片...`
+                                : `⚡ Compressing ${files.length} images...`
+                            );
+                            try {
+                              let totalOrig = 0;
+                              let totalComp = 0;
+                              const results = await Promise.all(
+                                files.map(async (file: File) => {
+                                  const res = await compressImageFile(file);
+                                  totalOrig += res.originalSize;
+                                  totalComp += res.compressedSize;
+                                  return res.dataUrl;
+                                })
+                              );
+                              setEditForm((prev) => ({
+                                ...prev,
+                                galleryImages: [
+                                  ...(prev?.galleryImages || []),
+                                  ...results
+                                ]
+                              }));
+                              const overallRatio = totalOrig > 0 ? Math.round(((totalOrig - totalComp) / totalOrig) * 100) : 0;
+                              setCompressNotice(
+                                language === 'zh'
+                                  ? `⚡ 已压缩并导入 ${files.length} 张图片 (${formatFileSize(totalOrig)} ➔ ${formatFileSize(totalComp)}, 节省 ${overallRatio}%)！`
+                                  : `⚡ Compressed & added ${files.length} images!`
+                              );
+                            } catch (err) {
+                              console.error(err);
+                              setCompressNotice(language === 'zh' ? '❌ 部分图片压缩失败' : '❌ Compression error');
+                            }
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
                   <textarea
                     rows={3}
                     value={(editForm.galleryImages || []).join('\n')}
                     onChange={(e) => setEditForm({ ...editForm, galleryImages: e.target.value.split('\n').filter((u) => u.trim().length > 0) })}
+                    placeholder={language === 'zh' ? '贴入图片 URL 或点击上方按钮直接从手机挑选图片' : 'Paste URLs or tap button above to select from phone'}
                     className="w-full p-3 text-xs font-mono bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl focus:outline-none focus:border-black dark:focus:border-white"
                   />
 
