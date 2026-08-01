@@ -34,6 +34,17 @@ export interface GuestMessage {
   userId?: string;
 }
 
+const DEFAULT_GUESTBOOK: GuestMessage[] = [
+  {
+    id: 'welcome-msg-1',
+    authorName: '齐思团队 (QSi Studio)',
+    email: '2691726671@qq.com',
+    content: '欢迎来到齐思设计作品集！您可以在此随时留言交流或提出网页修改建议，内容将实时高可用同步。',
+    avatarSuit: 'spade',
+    date: '2026/08/01 12:00:00'
+  }
+];
+
 // Global in-memory subscriber cache and PubSub listeners
 let cachedGuestMessages: GuestMessage[] = [];
 let guestMessageSubscribers: Array<(messages: GuestMessage[]) => void> = [];
@@ -64,6 +75,9 @@ export const subscribeGuestMessages = (
     if (cached.length > 0) {
       cachedGuestMessages = cached;
       callback(cached);
+    } else {
+      cachedGuestMessages = DEFAULT_GUESTBOOK;
+      callback(DEFAULT_GUESTBOOK);
     }
   }
 
@@ -125,87 +139,103 @@ export const subscribeGuestMessages = (
 };
 
 export const postGuestMessage = async (msg: Omit<GuestMessage, 'id' | 'createdAt' | 'userId'>): Promise<GuestMessage[]> => {
-  // 1. Send to Express Server API (/api/guestbook) - guaranteed to work in China & Cloudflare
-  const serverList = await postServerGuestbook({
-    authorName: msg.authorName,
-    email: msg.email,
-    content: msg.content,
-    projectId: msg.projectId,
-    projectTitle: msg.projectTitle
-  });
+  const suitOptions: Array<'spade' | 'heart' | 'diamond' | 'club'> = ['spade', 'heart', 'diamond', 'club'];
+  const randomSuit = suitOptions[Math.floor(Math.random() * suitOptions.length)];
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-  if (serverList && Array.isArray(serverList)) {
-    saveLocalSnapshot({ guestbook: serverList });
-    notifyGuestSubscribers(serverList);
-  }
+  const localId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+  const newMsg: GuestMessage = {
+    id: localId,
+    authorName: msg.authorName || '访客',
+    email: msg.email || '',
+    content: msg.content || '',
+    projectId: msg.projectId || '',
+    projectTitle: msg.projectTitle || '',
+    avatarSuit: msg.avatarSuit || randomSuit,
+    date: dateStr,
+    createdAt: now.toISOString()
+  };
 
-  // 2. Try Firestore asynchronously with no blocking await
-  ensureAuth().then(async (user) => {
-    const suitOptions: Array<'spade' | 'heart' | 'diamond' | 'club'> = ['spade', 'heart', 'diamond', 'club'];
-    const randomSuit = suitOptions[Math.floor(Math.random() * suitOptions.length)];
-    const payload: Record<string, any> = {
-      authorName: msg.authorName || '',
-      content: msg.content || '',
-      avatarSuit: msg.avatarSuit || randomSuit,
-      createdAt: serverTimestamp(),
-      userId: user.uid
-    };
-    if (msg.email) payload.email = msg.email;
-    if (msg.projectId) payload.projectId = msg.projectId;
-    if (msg.projectTitle) payload.projectTitle = msg.projectTitle;
+  // 1. Instant local update (0ms latency, guaranteed success everywhere)
+  const currentSnapshot = getLocalSnapshot();
+  const existingList = (cachedGuestMessages && cachedGuestMessages.length > 0)
+    ? cachedGuestMessages
+    : (currentSnapshot.guestbook || []);
 
-    await addDoc(collection(db, 'messages'), payload);
-  }).catch((err) => {
-    console.warn('Firestore postGuestMessage notice (handled smoothly):', err);
-  });
+  const updatedList = [newMsg, ...existingList];
+  cachedGuestMessages = updatedList;
+  saveLocalSnapshot({ guestbook: updatedList });
+  notifyGuestSubscribers(updatedList);
 
-  // 3. Fallback if server API offline
-  if (!serverList) {
-    const suitOptions: Array<'spade' | 'heart' | 'diamond' | 'club'> = ['spade', 'heart', 'diamond', 'club'];
-    const randomSuit = suitOptions[Math.floor(Math.random() * suitOptions.length)];
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  // 2. Fire-and-forget background sync to Cloud Run / Server API & Firestore
+  (async () => {
+    try {
+      const serverList = await postServerGuestbook({
+        authorName: msg.authorName,
+        email: msg.email,
+        content: msg.content,
+        projectId: msg.projectId,
+        projectTitle: msg.projectTitle
+      });
 
-    const newMsg: GuestMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      authorName: msg.authorName,
-      email: msg.email,
-      content: msg.content,
-      projectId: msg.projectId,
-      projectTitle: msg.projectTitle,
-      avatarSuit: msg.avatarSuit || randomSuit,
-      date: dateStr,
-      createdAt: now.toISOString()
-    };
+      if (serverList && Array.isArray(serverList) && serverList.length > 0) {
+        // Merge server list with local snapshot
+        saveLocalSnapshot({ guestbook: serverList });
+        notifyGuestSubscribers(serverList);
+      }
+    } catch (err) {
+      console.warn('Background server guestbook sync notice:', err);
+    }
 
-    const updated = [newMsg, ...cachedGuestMessages];
-    saveLocalSnapshot({ guestbook: updated });
-    notifyGuestSubscribers(updated);
-    return updated;
-  }
+    try {
+      ensureAuth().then(async (user) => {
+        const payload: Record<string, any> = {
+          authorName: msg.authorName || '',
+          content: msg.content || '',
+          avatarSuit: msg.avatarSuit || randomSuit,
+          createdAt: serverTimestamp(),
+          userId: user.uid
+        };
+        if (msg.email) payload.email = msg.email;
+        if (msg.projectId) payload.projectId = msg.projectId;
+        if (msg.projectTitle) payload.projectTitle = msg.projectTitle;
 
-  return serverList;
+        await addDoc(collection(db, 'messages'), payload);
+      }).catch((err) => {
+        console.warn('Firestore postGuestMessage notice:', err);
+      });
+    } catch (e) {}
+  })();
+
+  return updatedList;
 };
 
 export const deleteGuestMessage = async (messageId: string): Promise<GuestMessage[]> => {
-  // 1. Delete from Express Server API
-  const serverList = await deleteServerGuestbook(messageId);
+  // 1. Instant local removal (0ms latency)
+  const filtered = cachedGuestMessages.filter((m) => m.id !== messageId);
+  cachedGuestMessages = filtered;
+  saveLocalSnapshot({ guestbook: filtered });
+  notifyGuestSubscribers(filtered);
 
-  if (serverList && Array.isArray(serverList)) {
-    saveLocalSnapshot({ guestbook: serverList });
-    notifyGuestSubscribers(serverList);
-  } else {
-    const filtered = cachedGuestMessages.filter((m) => m.id !== messageId);
-    saveLocalSnapshot({ guestbook: filtered });
-    notifyGuestSubscribers(filtered);
-  }
+  // 2. Background sync
+  (async () => {
+    try {
+      const serverList = await deleteServerGuestbook(messageId);
+      if (serverList && Array.isArray(serverList)) {
+        saveLocalSnapshot({ guestbook: serverList });
+        notifyGuestSubscribers(serverList);
+      }
+    } catch (e) {}
 
-  // 2. Try Firestore async
-  ensureAuth().then(async () => {
-    await deleteDoc(doc(db, 'messages', messageId));
-  }).catch((e) => console.warn('Firestore delete notice:', e));
+    try {
+      ensureAuth().then(async () => {
+        await deleteDoc(doc(db, 'messages', messageId));
+      }).catch((e) => console.warn('Firestore delete notice:', e));
+    } catch (e) {}
+  })();
 
-  return serverList || cachedGuestMessages;
+  return filtered;
 };
 
 // 2. REAL-TIME CLOUD PROJECTS SYNC (云端作品同步)

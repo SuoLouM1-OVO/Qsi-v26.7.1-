@@ -137,7 +137,20 @@ async function startServer() {
 
   app.post("/api/sync", (req, res) => {
     try {
-      const payload = req.body;
+      const payload = req.body || {};
+      // Safeguard: Never overwrite DB with empty projects list
+      if (!payload.projects || !Array.isArray(payload.projects) || payload.projects.length === 0) {
+        if (fs.existsSync(DB_FILE)) {
+          try {
+            const raw = fs.readFileSync(DB_FILE, "utf-8");
+            const existing = JSON.parse(raw);
+            if (Array.isArray(existing?.projects) && existing.projects.length > 0) {
+              payload.projects = existing.projects;
+            }
+          } catch (e) {}
+        }
+      }
+
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }

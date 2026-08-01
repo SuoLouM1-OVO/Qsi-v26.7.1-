@@ -79,25 +79,32 @@ export default function App() {
   const [isAboutManagerOpen, setIsAboutManagerOpen] = useState(false);
   const [isSyncManagerOpen, setIsSyncManagerOpen] = useState(false);
 
-  // Initial Server API Sync Effect (For China & Local Server Direct Sync)
+  // Initial & Periodic Server API Sync Effect (For China & Cloudflare Direct Sync)
   useEffect(() => {
-    fetchServerSyncData().then((serverData) => {
-      if (serverData) {
-        if (Array.isArray(serverData.projects) && serverData.projects.length > 0) {
-          setProjects(serverData.projects);
-          saveLocalSnapshot({ projects: serverData.projects });
+    const doSync = () => {
+      fetchServerSyncData().then((serverData) => {
+        if (serverData) {
+          if (Array.isArray(serverData.projects) && serverData.projects.length > 0) {
+            setProjects(serverData.projects);
+            saveLocalSnapshot({ projects: serverData.projects });
+          }
+          if (serverData.aboutData) {
+            setAboutData(serverData.aboutData);
+            saveLocalSnapshot({ aboutData: serverData.aboutData });
+          }
+          if (serverData.likes) {
+            setCloudLikes(serverData.likes);
+          }
         }
-        if (serverData.aboutData) {
-          setAboutData(serverData.aboutData);
-          saveLocalSnapshot({ aboutData: serverData.aboutData });
-        }
-        if (serverData.likes) {
-          setCloudLikes(serverData.likes);
-        }
-      }
-    }).catch((err) => {
-      console.warn('Initial server sync notice:', err);
-    });
+      }).catch((err) => {
+        console.warn('Server sync notice:', err);
+      });
+    };
+
+    doSync();
+    // Low frequency background polling (10s) for China devices without VPN
+    const interval = setInterval(doSync, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Real-time Cloud Sync Effect (Firebase Firestore)

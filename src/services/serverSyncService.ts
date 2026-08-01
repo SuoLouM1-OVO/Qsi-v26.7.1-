@@ -13,8 +13,8 @@ export interface FullBackupPayload {
 const CLOUD_RUN_BACKEND_URL = 'https://ais-pre-npfi3bhin65t45nidjshwv-434417124417.us-west2.run.app';
 
 // Universal API Fetch with direct Cloud Run Backend Fallback for Cloudflare Pages / Workers
-const cloudApiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 4000): Promise<Response | null> => {
-  // 1. Try relative request first
+const cloudApiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response | null> => {
+  // 1. Try relative request first (Cloudflare Pages Functions Proxy)
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -39,10 +39,13 @@ const cloudApiFetch = async (path: string, options: RequestInit = {}, timeoutMs 
       const res = await fetch(remoteUrl, { ...options, signal: controller.signal });
       clearTimeout(id);
       if (res.ok) {
-        return res;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return res;
+        }
       }
     } catch (err) {
-      console.warn(`Remote backend API fallback notice (${path}):`, err);
+      // Quiet fail in China without VPN
     }
   }
 
