@@ -367,6 +367,7 @@ export default function App() {
         {/* HOME SECTION */}
         <section id="home" className="relative z-20 scroll-mt-20">
           <HomeTab
+            projects={projects}
             onSelectProject={(project) => {
               playClickSound();
               setSelectedProject(project);

@@ -60,6 +60,7 @@ interface HomeTabProps {
   language: Language;
   isIntroReady?: boolean;
   likesMap?: Record<string, number>;
+  projects?: Project[];
 }
 
 // 10 Perimeter slots for clean card placement around central text
@@ -76,9 +77,12 @@ const TEN_PERIMETER_SLOTS = [
   { x: 92, y: 88, rotation: -20, scale: 0.88 }
 ];
 
-const createTop10Items = (likesMap: Record<string, number> = {}): FloatingItem[] => {
+const createTop10Items = (
+  likesMap: Record<string, number> = {},
+  projectsList: Project[] = PROJECTS
+): FloatingItem[] => {
   // Sort projects: highest likes descending
-  const sorted = [...PROJECTS].sort((a, b) => {
+  const sorted = [...projectsList].sort((a, b) => {
     const likesA = likesMap[a.id] ?? a.likes ?? 0;
     const likesB = likesMap[b.id] ?? b.likes ?? 0;
     if (likesB !== likesA) {
@@ -113,9 +117,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   playClickSound,
   language,
   isIntroReady = true,
-  likesMap = {}
+  likesMap = {},
+  projects
 }) => {
-  const [items, setItems] = useState<FloatingItem[]>(() => createTop10Items(likesMap));
+  const activeProjects = (projects && projects.length > 0) ? projects : PROJECTS;
+  const [items, setItems] = useState<FloatingItem[]>(() => createTop10Items(likesMap, activeProjects));
   const [isRandomized, setIsRandomized] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
 
@@ -128,12 +134,15 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     return () => window.removeEventListener('resize', checkTouch);
   }, []);
 
-  // Sync top 10 items if likesMap updates and user hasn't shuffled to random draw mode
+  // Sync top 10 items if projects or likesMap updates
   useEffect(() => {
     if (!isRandomized) {
-      setItems(createTop10Items(likesMap));
+      setItems(createTop10Items(likesMap, activeProjects));
+    } else {
+      // Filter out deleted projects if in random mode
+      setItems((prev) => prev.filter((it) => activeProjects.some((p) => p.id === it.projectId)));
     }
-  }, [likesMap, isRandomized]);
+  }, [projects, likesMap, isRandomized]);
 
   const [activeZ, setActiveZ] = useState(20);
   const [rolledProject, setRolledProject] = useState<Project | null>(null);
@@ -206,12 +215,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     });
   };
 
-  // Shuffle & Random Draw: Pick 10 random distinct projects from PROJECTS and scatter them
+  // Shuffle & Random Draw: Pick 10 random distinct projects from activeProjects and scatter them
   const handleShuffle = () => {
     playClickSound();
     setIsRandomized(true);
 
-    const shuffledProjects = [...PROJECTS].sort(() => Math.random() - 0.5).slice(0, 10);
+    const shuffledProjects = [...activeProjects].sort(() => Math.random() - 0.5).slice(0, 10);
 
     const newRandomItems: FloatingItem[] = shuffledProjects.map((project, idx) => {
       const side = idx % 4; // 0: top, 1: bottom, 2: left, 3: right
@@ -253,7 +262,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   const handleResetTop10 = () => {
     playClickSound();
     setIsRandomized(false);
-    setItems(createTop10Items(likesMap));
+    setItems(createTop10Items(likesMap, activeProjects));
   };
 
   // Roll dice for random project
@@ -261,8 +270,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     playClickSound();
     setIsRolling(true);
     setTimeout(() => {
-      const randomIndex = Math.floor(Math.random() * PROJECTS.length);
-      setRolledProject(PROJECTS[randomIndex]);
+      const randomIndex = Math.floor(Math.random() * activeProjects.length);
+      setRolledProject(activeProjects[randomIndex]);
       setIsRolling(false);
     }, 500);
   };
@@ -348,10 +357,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             const width = canvasRef.current?.clientWidth || 1200;
             const height = canvasRef.current?.clientHeight || 700;
 
-            return items.map((item, index) => {
-              const matchedProject = item.projectId
-                ? PROJECTS.find((p) => p.id === item.projectId)
-                : null;
+            return items
+              .filter((item) => !item.projectId || activeProjects.some((p) => p.id === item.projectId))
+              .map((item, index) => {
+                const matchedProject = item.projectId
+                  ? activeProjects.find((p) => p.id === item.projectId)
+                  : null;
 
               const isHovered = hoveredItemId === item.id;
               const isDragged = draggedItemId === item.id;

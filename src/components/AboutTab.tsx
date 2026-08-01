@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Mail,
@@ -28,7 +28,7 @@ import { ABOUT_DATA } from '../data/portfolioData';
 import { Language } from '../types';
 import { QSiLogo } from './QSiLogo';
 import { Edit3 } from 'lucide-react';
-import { postGuestMessage } from '../services/firebaseService';
+import { postGuestMessage, subscribeGuestMessages, deleteGuestMessage } from '../services/firebaseService';
 
 interface AboutTabProps {
   playClickSound: () => void;
@@ -118,37 +118,38 @@ export const AboutTab: React.FC<AboutTabProps> = ({
     }
   };
 
-  // Local Storage Persistent Inbox Messages Log
-  const [inboxMessages, setInboxMessages] = useState<MessageLogItem[]>(() => {
-    const saved = localStorage.getItem('qsi_messages_inbox');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // ignore
-      }
-    }
-    return DEFAULT_MESSAGES;
-  });
+  // Real-time Cloud Guestbook Subscription for Lower Messages Log
+  const [inboxMessages, setInboxMessages] = useState<MessageLogItem[]>([]);
 
-  const saveInbox = (msgs: MessageLogItem[]) => {
-    setInboxMessages(msgs);
-    try {
-      localStorage.setItem('qsi_messages_inbox', JSON.stringify(msgs));
-    } catch (e) {
-      // ignore
-    }
-  };
+  useEffect(() => {
+    const unsubscribe = subscribeGuestMessages((list) => {
+      const formatted: MessageLogItem[] = list.map((msg) => ({
+        id: msg.id || `msg-${Date.now()}`,
+        name: msg.authorName || '匿名访客',
+        email: msg.email || '',
+        message: msg.content || '',
+        date: msg.date || (msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleString('zh-CN', { hour12: false }) : '刚刚'),
+        projectTitle: msg.projectTitle
+      }));
+      setInboxMessages(formatted);
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
 
-  const handleDeleteMessage = (id: string) => {
+  const handleDeleteMessage = async (id: string) => {
     playClickSound();
-    const updated = inboxMessages.filter((m) => m.id !== id);
-    saveInbox(updated);
+    try {
+      await deleteGuestMessage(id);
+    } catch (e) {
+      console.warn('Delete message notice:', e);
+    }
   };
 
   const handleClearInbox = () => {
     playClickSound();
-    saveInbox([]);
+    setInboxMessages([]);
   };
 
   // Skill Tags array for individual icon badges
@@ -206,21 +207,6 @@ export const AboutTab: React.FC<AboutTabProps> = ({
     e.preventDefault();
     playClickSound();
     if (formData.name && formData.email && formData.message) {
-      const nowStr = new Date();
-      const dateFormatted = `${nowStr.getFullYear()}-${String(nowStr.getMonth() + 1).padStart(2, '0')}-${String(nowStr.getDate()).padStart(2, '0')} ${String(nowStr.getHours()).padStart(2, '0')}:${String(nowStr.getMinutes()).padStart(2, '0')}`;
-
-      const newRecord: MessageLogItem = {
-        id: `msg-${Date.now()}`,
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        message: formData.message.trim(),
-        date: dateFormatted
-      };
-
-      const updated = [newRecord, ...inboxMessages];
-      saveInbox(updated);
-
-      // Synchronize directly with Cloud Firestore Guestbook
       try {
         await postGuestMessage({
           authorName: formData.name.trim(),
@@ -228,7 +214,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           content: formData.message.trim()
         });
       } catch (err) {
-        console.warn('Firebase sync notice:', err);
+        console.warn('Post guest message notice:', err);
       }
 
       setFormData({ name: '', email: '', message: '' });
