@@ -13,11 +13,17 @@ import { ProjectModal } from './components/ProjectModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
 import { AboutManagerModal } from './components/AboutManagerModal';
 import { GuestbookModal } from './components/GuestbookModal';
+import { SyncManagerModal } from './components/SyncManagerModal';
 import { CustomCursor } from './components/CustomCursor';
 import { IntroLoader } from './components/IntroLoader';
 import { PROJECTS as INITIAL_DEFAULT_PROJECTS, ABOUT_DATA as INITIAL_ABOUT_DATA } from './data/portfolioData';
 import { TabType, Project, Language } from './types';
 import { soundSynth } from './utils/sound';
+import {
+  fetchServerSyncData,
+  pushServerSyncData,
+  saveLocalSnapshot
+} from './services/serverSyncService';
 import {
   subscribeCloudProjects,
   syncProjectsToCloud,
@@ -71,8 +77,30 @@ export default function App() {
   });
 
   const [isAboutManagerOpen, setIsAboutManagerOpen] = useState(false);
+  const [isSyncManagerOpen, setIsSyncManagerOpen] = useState(false);
 
-  // Real-time Cloud Sync Effect
+  // Initial Server API Sync Effect (For China & Local Server Direct Sync)
+  useEffect(() => {
+    fetchServerSyncData().then((serverData) => {
+      if (serverData) {
+        if (serverData.projects && serverData.projects.length > 0) {
+          setProjects(serverData.projects);
+          saveLocalSnapshot({ projects: serverData.projects });
+        }
+        if (serverData.aboutData) {
+          setAboutData(serverData.aboutData);
+          saveLocalSnapshot({ aboutData: serverData.aboutData });
+        }
+        if (serverData.likes) {
+          setCloudLikes(serverData.likes);
+        }
+      }
+    }).catch((err) => {
+      console.warn('Initial server sync notice:', err);
+    });
+  }, []);
+
+  // Real-time Cloud Sync Effect (Firebase Firestore)
   useEffect(() => {
     const unsubProjects = subscribeCloudProjects((cloudList) => {
       if (cloudList && cloudList.length > 0) {
@@ -107,6 +135,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    pushServerSyncData({ aboutData: updated }).catch((e) => console.warn(e));
     syncAboutDataToCloud(updated).catch((e) => console.error('Cloud sync about data err:', e));
   };
 
@@ -117,6 +146,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    pushServerSyncData({ aboutData: INITIAL_ABOUT_DATA }).catch((e) => console.warn(e));
     syncAboutDataToCloud(INITIAL_ABOUT_DATA).catch((e) => console.error('Cloud reset about data err:', e));
   };
 
@@ -135,6 +165,8 @@ export default function App() {
       // ignore
     }
 
+    pushServerSyncData({ projects: newProjects }).catch((e) => console.warn(e));
+
     // Delete removed items from Cloud Firestore so they don't reappear on real-time sync
     removedProjects.forEach((p) => {
       deleteCloudProject(p.id).catch((e) => console.error('Cloud delete project err:', e));
@@ -151,6 +183,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    pushServerSyncData({ projects: INITIAL_DEFAULT_PROJECTS }).catch((e) => console.warn(e));
     syncProjectsToCloud(INITIAL_DEFAULT_PROJECTS).catch((e) => console.error('Cloud reset err:', e));
   };
 
@@ -321,6 +354,10 @@ export default function App() {
           setGuestbookPreselectId('');
           setIsGuestbookOpen(true);
         }}
+        onOpenSyncManager={() => {
+          playClickSound();
+          setIsSyncManagerOpen(true);
+        }}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}
       />
@@ -451,6 +488,28 @@ export default function App() {
         onResetAboutData={handleResetAboutData}
         playClickSound={playClickSound}
         language={language}
+      />
+
+      {/* DATA SYNC & CHINA ACCELERATION MODAL */}
+      <SyncManagerModal
+        isOpen={isSyncManagerOpen}
+        onClose={() => setIsSyncManagerOpen(false)}
+        language={language}
+        onDataReload={(reloadedData) => {
+          if (reloadedData.projects && reloadedData.projects.length > 0) {
+            setProjects(reloadedData.projects);
+          }
+          if (reloadedData.aboutData) {
+            setAboutData(reloadedData.aboutData);
+          }
+          if (reloadedData.likes) {
+            setCloudLikes(reloadedData.likes);
+          }
+        }}
+        onResetDefaults={() => {
+          handleResetProjects();
+          handleResetAboutData();
+        }}
       />
 
       {/* INITIALIZATION INTRO LOADER */}
