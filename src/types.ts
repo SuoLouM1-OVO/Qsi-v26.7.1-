@@ -76,3 +76,37 @@ export interface CustomSection {
   items: CustomSectionItem[];
 }
 
+export interface AboutData {
+  name: string;
+  englishName: string;
+  title: string;
+  englishTitle?: string;
+  location: string;
+  email: string;
+  phone: string;
+  wechat: string;
+  qq: string;
+  xiaohongshu?: string;
+  behance?: string;
+  dribbble?: string;
+  instagram?: string;
+  bio: string[] | string;
+  philosophy?: string;
+  manifesto?: string[] | string;
+  skills?: (string | { category: string; items: string[] })[];
+  skillTags?: (string | { name: string; category: string })[];
+  experience: ExperienceItem[];
+  education: EducationItem[];
+  awards: AwardItem[];
+  social?: {
+    xiaohongshu?: string;
+    behance?: string;
+    dribbble?: string;
+    instagram?: string;
+    wechat?: string;
+    qq?: string;
+    email?: string;
+  };
+  customSections?: CustomSection[];
+}
+

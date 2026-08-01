@@ -4,6 +4,7 @@ import { Dices, Shuffle, ArrowRight, Eye, RefreshCw, Sparkles, Folder, Mail } fr
 import { FLOATING_ITEMS, PROJECTS } from '../data/portfolioData';
 import { Project, FloatingItem, Language } from '../types';
 import { QSiLogo } from './QSiLogo';
+import { FourPointStar } from './FourPointStar';
 
 // Realistic 3D Cubic Dice Component with Specular Lighting & Smooth Rounded Edges
 const Realistic3DDice: React.FC<{ isRolling?: boolean; className?: string }> = ({ isRolling, className = "w-10 h-10" }) => {
@@ -60,6 +61,7 @@ interface HomeTabProps {
   language: Language;
   isIntroReady?: boolean;
   likesMap?: Record<string, number>;
+  onIncrementLike?: (projectId: string) => void;
   projects?: Project[];
 }
 
@@ -118,6 +120,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   language,
   isIntroReady = true,
   likesMap = {},
+  onIncrementLike,
   projects
 }) => {
   const activeProjects = Array.isArray(projects) ? projects : PROJECTS;
@@ -512,7 +515,21 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   </div>
 
                   {matchedProject && (
-                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-end text-[10px] text-gray-500 dark:text-neutral-400 font-mono uppercase tracking-wider">
+                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between text-[10px] text-gray-500 dark:text-neutral-400 font-mono uppercase tracking-wider">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playClickSound();
+                          if (onIncrementLike) onIncrementLike(matchedProject.id);
+                        }}
+                        className="flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:scale-105 transition-transform"
+                        title={language === 'zh' ? '点赞/PIN +1' : 'Pin +1'}
+                      >
+                        <FourPointStar className="w-3 h-3 fill-current text-amber-500" />
+                        <span>{likesMap[matchedProject.id] ?? (matchedProject.likes || 12)}</span>
+                      </button>
+
                       <span className="text-black dark:text-white font-semibold group-hover:underline">
                         {language === 'zh' ? '查看作品' : 'VIEW'} ↗
                       </span>

@@ -49,6 +49,19 @@ const DEFAULT_GUESTBOOK: GuestMessage[] = [
 let cachedGuestMessages: GuestMessage[] = [];
 let guestMessageSubscribers: Array<(messages: GuestMessage[]) => void> = [];
 
+// Cross-tab real-time sync channel
+const guestChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window ? new BroadcastChannel('qsi_guestbook_sync') : null;
+if (guestChannel) {
+  guestChannel.onmessage = (event) => {
+    if (event.data && Array.isArray(event.data)) {
+      cachedGuestMessages = event.data;
+      guestMessageSubscribers.forEach((cb) => {
+        try { cb(event.data); } catch (e) {}
+      });
+    }
+  };
+}
+
 const notifyGuestSubscribers = (messages: GuestMessage[]) => {
   cachedGuestMessages = messages;
   guestMessageSubscribers.forEach((cb) => {
@@ -58,6 +71,9 @@ const notifyGuestSubscribers = (messages: GuestMessage[]) => {
       console.warn('Subscriber notification error:', e);
     }
   });
+  if (guestChannel) {
+    try { guestChannel.postMessage(messages); } catch (e) {}
+  }
 };
 
 // 1. GUESTBOOK MESSAGES (访客留言/改动建议 - 混合同步：保障中国大陆与Cloudflare极速无阻)

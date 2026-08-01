@@ -389,6 +389,7 @@ export default function App() {
             language={language}
             isIntroReady={isIntroReady}
             likesMap={likesMap}
+            onIncrementLike={handleIncrementLike}
           />
         </section>
 

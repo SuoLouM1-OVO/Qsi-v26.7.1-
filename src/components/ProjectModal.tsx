@@ -778,6 +778,42 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     </span>
                   ))}
                 </div>
+
+                {/* Live Pin & Like Engagement Bar */}
+                <div className="pt-5 mt-4 border-t border-gray-100 dark:border-neutral-800 flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playClickSound();
+                        onIncrementLike(project.id);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-full text-xs font-mono font-bold hover:scale-105 active:scale-95 transition-all shadow-xs cursor-pointer"
+                      title={language === 'zh' ? '点击给作品钉住/点赞' : 'Pin & Like Project'}
+                    >
+                      <FourPointStar className="w-3.5 h-3.5 fill-current text-amber-400 dark:text-amber-500" />
+                      <span>PIN / 点赞 ({currentLikes})</span>
+                    </button>
+                    <span className="text-[11px] font-mono text-gray-400 dark:text-neutral-500">
+                      {language === 'zh' ? '全网真实互动值' : 'Live Pin Count'}
+                    </span>
+                  </div>
+
+                  {onOpenComment && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playClickSound();
+                        onOpenComment(project.id);
+                      }}
+                      className="px-3.5 py-2 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 rounded-full text-xs font-mono font-bold transition-all flex items-center gap-1.5 border border-emerald-200 dark:border-emerald-800 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>{language === 'zh' ? '针对此作品留言' : 'Comment on Case'}</span>
+                    </button>
+                  )}
+                </div>
               </>
             )}
 
