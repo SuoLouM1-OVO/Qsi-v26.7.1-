@@ -49,11 +49,10 @@ export default function App() {
   // Dynamic Portfolio Projects State (Loaded from localStorage or default dataset, then synced with Cloud Firestore)
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('qsi_custom_projects');
-    const hasSavedFlag = localStorage.getItem('qsi_has_saved_projects') === 'true';
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && (parsed.length > 0 || hasSavedFlag)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
         // Fallback
       }
@@ -87,7 +86,6 @@ export default function App() {
         if (Array.isArray(serverData.projects) && serverData.projects.length > 0) {
           setProjects(serverData.projects);
           saveLocalSnapshot({ projects: serverData.projects });
-          try { localStorage.setItem('qsi_has_saved_projects', 'true'); } catch (e) {}
         }
         if (serverData.aboutData) {
           setAboutData(serverData.aboutData);
@@ -106,7 +104,7 @@ export default function App() {
   useEffect(() => {
     const unsubProjects = subscribeCloudProjects((cloudList) => {
       console.log('[App.tsx] Real-time Cloud Projects updated. Count:', cloudList?.length);
-      if (Array.isArray(cloudList)) {
+      if (Array.isArray(cloudList) && cloudList.length > 0) {
         setProjects(cloudList);
         saveLocalSnapshot({ projects: cloudList });
       }

@@ -96,20 +96,23 @@ export const SyncManagerModal: React.FC<SyncManagerModalProps> = ({
     setIsSyncingServer(true);
     setSyncNotice('');
 
+    // Ensure snapshot contains valid data
+    const currentSnapshot = getLocalSnapshot();
+
     // Push local snapshot to local node server first
-    await pushServerSyncData(localSnapshot);
+    await pushServerSyncData(currentSnapshot);
 
     // Pull back server data
     const serverData = await fetchServerSyncData();
     setIsSyncingServer(false);
 
-    if (serverData) {
+    if (serverData && Array.isArray(serverData.projects) && serverData.projects.length > 0) {
       onDataReload(serverData);
       setSyncNotice(language === 'zh' ? '已成功与本站自建 Server 服务端对齐！' : 'Successfully synced with local server!');
     } else {
       setSyncNotice(
         language === 'zh'
-          ? '已完成本地高可用写入，自建后端 API 已保持同步。'
+          ? '已保存本地高可用快照，网站作品数据完整防护中！'
           : 'Local snapshot updated and saved.'
       );
     }

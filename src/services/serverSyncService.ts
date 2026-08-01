@@ -1,4 +1,5 @@
 import { Project } from '../types';
+import { PROJECTS, ABOUT_DATA } from '../data/portfolioData';
 
 export interface FullBackupPayload {
   version: string;
@@ -55,7 +56,15 @@ export const fetchServerSyncData = async (): Promise<FullBackupPayload | null> =
     if (res && res.ok) {
       const json = await res.json();
       if (json && json.success && json.data) {
-        return json.data as FullBackupPayload;
+        const data = json.data as FullBackupPayload;
+        // Ensure projects is never empty array
+        if (!data.projects || !Array.isArray(data.projects) || data.projects.length === 0) {
+          data.projects = PROJECTS;
+        }
+        if (!data.aboutData) {
+          data.aboutData = ABOUT_DATA;
+        }
+        return data;
       }
     }
   } catch (err) {
@@ -126,11 +135,14 @@ export const deleteServerGuestbook = async (msgId: string): Promise<any[] | null
 export const pushServerSyncData = async (payload: Partial<FullBackupPayload>): Promise<boolean> => {
   try {
     const existing = getLocalSnapshot();
+    const finalProjects = (payload.projects && Array.isArray(payload.projects) && payload.projects.length > 0) ? payload.projects : existing.projects;
+    const finalAboutData = payload.aboutData || existing.aboutData || ABOUT_DATA;
+
     const merged: FullBackupPayload = {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
-      projects: payload.projects || existing.projects,
-      aboutData: payload.aboutData || existing.aboutData,
+      projects: finalProjects,
+      aboutData: finalAboutData,
       likes: payload.likes || existing.likes,
       guestbook: payload.guestbook || existing.guestbook,
     };
@@ -157,13 +169,26 @@ export const getLocalSnapshot = (): FullBackupPayload => {
 
   try {
     const p = localStorage.getItem('qsi_custom_projects');
-    if (p) projects = JSON.parse(p);
+    if (p) {
+      const parsed = JSON.parse(p);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        projects = parsed;
+      }
+    }
   } catch (e) {}
+
+  if (!projects || projects.length === 0) {
+    projects = PROJECTS;
+  }
 
   try {
     const a = localStorage.getItem('qsi_custom_about_data');
     if (a) aboutData = JSON.parse(a);
   } catch (e) {}
+
+  if (!aboutData) {
+    aboutData = ABOUT_DATA;
+  }
 
   try {
     const l = localStorage.getItem('qsi_cloud_likes_cache');
@@ -172,7 +197,7 @@ export const getLocalSnapshot = (): FullBackupPayload => {
 
   try {
     const g = localStorage.getItem('qsi_guestbook_cache');
-    if (g) guestbook = JSON.parse(g);
+    if (g && Array.isArray(JSON.parse(g))) guestbook = JSON.parse(g);
   } catch (e) {}
 
   return {
@@ -188,7 +213,7 @@ export const getLocalSnapshot = (): FullBackupPayload => {
 // Helper: Save snapshot directly to localStorage
 export const saveLocalSnapshot = (snapshot: Partial<FullBackupPayload>) => {
   try {
-    if (snapshot.projects && Array.isArray(snapshot.projects)) {
+    if (snapshot.projects && Array.isArray(snapshot.projects) && snapshot.projects.length > 0) {
       localStorage.setItem('qsi_custom_projects', JSON.stringify(snapshot.projects));
     }
     if (snapshot.aboutData) {
