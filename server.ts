@@ -9,6 +9,17 @@ async function startServer() {
 
   app.use(express.json({ limit: "20mb" }));
 
+  // Enable CORS for external deployments (e.g. Cloudflare Pages / Workers)
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   const DATA_DIR = path.join(process.cwd(), "data_store");
   const DB_FILE = path.join(DATA_DIR, "db.json");
 
