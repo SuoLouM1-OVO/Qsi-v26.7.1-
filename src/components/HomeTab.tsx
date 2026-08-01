@@ -120,7 +120,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   likesMap = {},
   projects
 }) => {
-  const activeProjects = (projects && projects.length > 0) ? projects : PROJECTS;
+  const activeProjects = Array.isArray(projects) ? projects : PROJECTS;
   const [items, setItems] = useState<FloatingItem[]>(() => createTop10Items(likesMap, activeProjects));
   const [isRandomized, setIsRandomized] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
@@ -140,7 +140,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       setItems(createTop10Items(likesMap, activeProjects));
     } else {
       // Filter out deleted projects if in random mode
-      setItems((prev) => prev.filter((it) => activeProjects.some((p) => p.id === it.projectId)));
+      setItems((prev) => prev.filter((it) => !it.projectId || activeProjects.some((p) => p.id === it.projectId)));
     }
   }, [projects, likesMap, isRandomized]);
 

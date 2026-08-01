@@ -34,33 +34,58 @@ export interface GuestMessage {
   userId?: string;
 }
 
+// Global in-memory subscriber cache and PubSub listeners
+let cachedGuestMessages: GuestMessage[] = [];
+let guestMessageSubscribers: Array<(messages: GuestMessage[]) => void> = [];
+
+const notifyGuestSubscribers = (messages: GuestMessage[]) => {
+  cachedGuestMessages = messages;
+  guestMessageSubscribers.forEach((cb) => {
+    try {
+      cb(messages);
+    } catch (e) {
+      console.warn('Subscriber notification error:', e);
+    }
+  });
+};
+
 // 1. GUESTBOOK MESSAGES (访客留言/改动建议 - 混合同步：保障中国大陆与Cloudflare极速无阻)
 export const subscribeGuestMessages = (
   callback: (messages: GuestMessage[]) => void,
   onError?: (error: Error) => void
 ): (() => void) => {
-  // 1. Instantly return local cached messages & fetch from server
-  const cached = getLocalSnapshot().guestbook || [];
-  if (cached.length > 0) {
-    callback(cached as GuestMessage[]);
+  guestMessageSubscribers.push(callback);
+
+  // Return cached or local snapshot instantly
+  if (cachedGuestMessages.length > 0) {
+    callback(cachedGuestMessages);
+  } else {
+    const cached = getLocalSnapshot().guestbook || [];
+    if (cached.length > 0) {
+      cachedGuestMessages = cached;
+      callback(cached);
+    }
   }
 
-  // Fetch from Express server API
+  // Fetch latest from Express server API immediately
   fetchServerGuestbook().then((serverList) => {
-    if (serverList && serverList.length > 0) {
+    if (serverList && Array.isArray(serverList) && serverList.length > 0) {
       saveLocalSnapshot({ guestbook: serverList });
-      callback(serverList as GuestMessage[]);
+      notifyGuestSubscribers(serverList);
     }
   }).catch((e) => console.warn('Server guestbook fetch notice:', e));
 
-  // Polling fallback for server API every 5s so updates in China show automatically
+  // Rapid polling interval (3s) for China & cross-device live updates without VPN
   const pollInterval = setInterval(() => {
     fetchServerGuestbook().then((serverList) => {
       if (serverList && Array.isArray(serverList)) {
-        callback(serverList as GuestMessage[]);
+        if (JSON.stringify(serverList) !== JSON.stringify(cachedGuestMessages)) {
+          saveLocalSnapshot({ guestbook: serverList });
+          notifyGuestSubscribers(serverList);
+        }
       }
     }).catch((e) => {});
-  }, 5000);
+  }, 3000);
 
   // Firestore real-time listener if available (for global real-time sockets)
   let unsubSnapshot: (() => void) | null = null;
@@ -80,7 +105,7 @@ export const subscribeGuestMessages = (
             };
           }) as GuestMessage[];
           saveLocalSnapshot({ guestbook: list });
-          callback(list);
+          notifyGuestSubscribers(list);
         }
       },
       (err) => {
@@ -94,6 +119,7 @@ export const subscribeGuestMessages = (
 
   return () => {
     clearInterval(pollInterval);
+    guestMessageSubscribers = guestMessageSubscribers.filter((cb) => cb !== callback);
     if (unsubSnapshot) unsubSnapshot();
   };
 };
@@ -107,6 +133,11 @@ export const postGuestMessage = async (msg: Omit<GuestMessage, 'id' | 'createdAt
     projectId: msg.projectId,
     projectTitle: msg.projectTitle
   });
+
+  if (serverList && Array.isArray(serverList)) {
+    saveLocalSnapshot({ guestbook: serverList });
+    notifyGuestSubscribers(serverList);
+  }
 
   // 2. Try Firestore asynchronously with no blocking await
   ensureAuth().then(async (user) => {
@@ -128,55 +159,53 @@ export const postGuestMessage = async (msg: Omit<GuestMessage, 'id' | 'createdAt
     console.warn('Firestore postGuestMessage notice (handled smoothly):', err);
   });
 
-  // 3. Save to localStorage cache & return
-  if (serverList) {
-    saveLocalSnapshot({ guestbook: serverList });
-    return serverList as GuestMessage[];
+  // 3. Fallback if server API offline
+  if (!serverList) {
+    const suitOptions: Array<'spade' | 'heart' | 'diamond' | 'club'> = ['spade', 'heart', 'diamond', 'club'];
+    const randomSuit = suitOptions[Math.floor(Math.random() * suitOptions.length)];
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const newMsg: GuestMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      authorName: msg.authorName,
+      email: msg.email,
+      content: msg.content,
+      projectId: msg.projectId,
+      projectTitle: msg.projectTitle,
+      avatarSuit: msg.avatarSuit || randomSuit,
+      date: dateStr,
+      createdAt: now.toISOString()
+    };
+
+    const updated = [newMsg, ...cachedGuestMessages];
+    saveLocalSnapshot({ guestbook: updated });
+    notifyGuestSubscribers(updated);
+    return updated;
   }
 
-  // Fallback if offline
-  const existing = getLocalSnapshot().guestbook || [];
-  const suitOptions: Array<'spade' | 'heart' | 'diamond' | 'club'> = ['spade', 'heart', 'diamond', 'club'];
-  const randomSuit = suitOptions[Math.floor(Math.random() * suitOptions.length)];
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-  const newMsg: GuestMessage = {
-    id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-    authorName: msg.authorName,
-    email: msg.email,
-    content: msg.content,
-    projectId: msg.projectId,
-    projectTitle: msg.projectTitle,
-    avatarSuit: msg.avatarSuit || randomSuit,
-    date: dateStr,
-    createdAt: now.toISOString()
-  };
-
-  const updated = [newMsg, ...existing];
-  saveLocalSnapshot({ guestbook: updated });
-  return updated;
+  return serverList;
 };
 
 export const deleteGuestMessage = async (messageId: string): Promise<GuestMessage[]> => {
   // 1. Delete from Express Server API
   const serverList = await deleteServerGuestbook(messageId);
 
+  if (serverList && Array.isArray(serverList)) {
+    saveLocalSnapshot({ guestbook: serverList });
+    notifyGuestSubscribers(serverList);
+  } else {
+    const filtered = cachedGuestMessages.filter((m) => m.id !== messageId);
+    saveLocalSnapshot({ guestbook: filtered });
+    notifyGuestSubscribers(filtered);
+  }
+
   // 2. Try Firestore async
   ensureAuth().then(async () => {
     await deleteDoc(doc(db, 'messages', messageId));
   }).catch((e) => console.warn('Firestore delete notice:', e));
 
-  // 3. Update localStorage
-  if (serverList) {
-    saveLocalSnapshot({ guestbook: serverList });
-    return serverList as GuestMessage[];
-  }
-
-  const existing = getLocalSnapshot().guestbook || [];
-  const updated = existing.filter((m: any) => m.id !== messageId);
-  saveLocalSnapshot({ guestbook: updated });
-  return updated;
+  return serverList || cachedGuestMessages;
 };
 
 // 2. REAL-TIME CLOUD PROJECTS SYNC (云端作品同步)
@@ -188,15 +217,20 @@ export const subscribeCloudProjects = (
 ): (() => void) => {
   let unsubSnapshot: (() => void) | null = null;
 
-  ensureAuth().then(() => {
+  ensureAuth().then((user) => {
+    console.log('[Firebase Auth] Authenticated UID for Cloud Projects:', user.uid);
     const q = query(collection(db, 'projects'));
     unsubSnapshot = onSnapshot(
       q,
       (snapshot) => {
+        const changes = snapshot.docChanges().map(c => `${c.type}:${c.doc.id}`);
+        console.log(`[Firebase Firestore] Projects snapshot received (${snapshot.docs.length} items). Changes: [${changes.join(', ')}]`);
+
         if (snapshot.empty) {
           if (!hasSeededCloudProjects && onSeedDefaults) {
             hasSeededCloudProjects = true;
             try { localStorage.setItem('qsi_cloud_projects_seeded', 'true'); } catch (e) {}
+            console.log('[Firebase Firestore] Projects collection empty. Seeding defaults...');
             onSeedDefaults();
           } else {
             callback([]);
@@ -217,15 +251,18 @@ export const subscribeCloudProjects = (
         callback(list);
       },
       (err) => {
-        console.warn('Projects sync connection notice:', err);
+        console.warn('[Firebase Firestore Warning] Projects sync connection error:', err?.message || err);
       }
     );
   }).catch((err) => {
-    console.warn('Auth check notice in subscribeCloudProjects:', err);
+    console.warn('[Firebase Auth Warning] Auth check error in subscribeCloudProjects:', err?.message || err);
   });
 
   return () => {
-    if (unsubSnapshot) unsubSnapshot();
+    if (unsubSnapshot) {
+      console.log('[Firebase Firestore] Unsubscribing from Cloud Projects listener');
+      unsubSnapshot();
+    }
   };
 };
 

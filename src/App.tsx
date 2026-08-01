@@ -49,10 +49,11 @@ export default function App() {
   // Dynamic Portfolio Projects State (Loaded from localStorage or default dataset, then synced with Cloud Firestore)
   const [projects, setProjects] = useState<Project[]>(() => {
     const saved = localStorage.getItem('qsi_custom_projects');
+    const hasSavedFlag = localStorage.getItem('qsi_has_saved_projects') === 'true';
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && (parsed.length > 0 || hasSavedFlag)) return parsed;
       } catch (e) {
         // Fallback
       }
@@ -83,9 +84,10 @@ export default function App() {
   useEffect(() => {
     fetchServerSyncData().then((serverData) => {
       if (serverData) {
-        if (serverData.projects && serverData.projects.length > 0) {
+        if (Array.isArray(serverData.projects) && serverData.projects.length > 0) {
           setProjects(serverData.projects);
           saveLocalSnapshot({ projects: serverData.projects });
+          try { localStorage.setItem('qsi_has_saved_projects', 'true'); } catch (e) {}
         }
         if (serverData.aboutData) {
           setAboutData(serverData.aboutData);
@@ -103,11 +105,14 @@ export default function App() {
   // Real-time Cloud Sync Effect (Firebase Firestore)
   useEffect(() => {
     const unsubProjects = subscribeCloudProjects((cloudList) => {
-      if (cloudList && cloudList.length > 0) {
+      console.log('[App.tsx] Real-time Cloud Projects updated. Count:', cloudList?.length);
+      if (Array.isArray(cloudList)) {
         setProjects(cloudList);
+        saveLocalSnapshot({ projects: cloudList });
       }
     }, () => {
       // Seed default projects to cloud if empty
+      console.log('[App.tsx] Seeding initial default projects to Cloud Firestore');
       syncProjectsToCloud(INITIAL_DEFAULT_PROJECTS);
     });
 
@@ -161,10 +166,12 @@ export default function App() {
     setProjects(newProjects);
     try {
       localStorage.setItem('qsi_custom_projects', JSON.stringify(newProjects));
+      localStorage.setItem('qsi_has_saved_projects', 'true');
     } catch (e) {
       // ignore
     }
 
+    saveLocalSnapshot({ projects: newProjects });
     pushServerSyncData({ projects: newProjects }).catch((e) => console.warn(e));
 
     // Delete removed items from Cloud Firestore so they don't reappear on real-time sync
