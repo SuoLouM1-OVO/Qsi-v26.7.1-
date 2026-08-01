@@ -13,29 +13,39 @@ export interface FullBackupPayload {
 const CLOUD_RUN_BACKEND_URL = 'https://ais-pre-npfi3bhin65t45nidjshwv-434417124417.us-west2.run.app';
 
 // Universal API Fetch with direct Cloud Run Backend Fallback for Cloudflare Pages / Workers
-const cloudApiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 2500): Promise<Response | null> => {
-  // 1. Try relative request first (Cloudflare Pages Functions Proxy)
-  try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(path, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    if (res.ok) {
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        return res;
-      }
-    }
-  } catch (e) {
-    // Relative request failed or timed out
+const cloudApiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 8000): Promise<Response | null> => {
+  // Add cache buster parameter to GET requests
+  const method = (options.method || 'GET').toUpperCase();
+  let targetPath = path;
+  if (method === 'GET') {
+    const sep = targetPath.includes('?') ? '&' : '?';
+    targetPath = `${targetPath}${sep}_t=${Date.now()}`;
   }
 
-  // 2. If relative failed (e.g. static Cloudflare Pages hosting), fallback to Cloud Run Backend URL
-  if (typeof window !== 'undefined') {
+  // 1. Try relative request first (Cloudflare Pages Functions Proxy - Works in China)
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const remoteUrl = `${CLOUD_RUN_BACKEND_URL}${path.startsWith('/') ? path : '/' + path}`;
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(targetPath, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return res;
+        }
+      }
+    } catch (e) {
+      // Retry once on transient network glitch
+    }
+  }
+
+  // 2. If relative failed (e.g. preview environment without worker), fallback to direct Cloud Run Backend URL
+  if (typeof window !== 'undefined') {
+    try {
+      const remoteUrl = `${CLOUD_RUN_BACKEND_URL}${targetPath.startsWith('/') ? targetPath : '/' + targetPath}`;
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(remoteUrl, { ...options, signal: controller.signal });
       clearTimeout(id);
       if (res.ok) {
