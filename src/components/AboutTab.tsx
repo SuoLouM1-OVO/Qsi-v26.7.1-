@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Mail,
@@ -22,13 +22,14 @@ import {
   Lock,
   Unlock,
   KeyRound,
-  ShieldAlert
+  ShieldAlert,
+  Plus
 } from 'lucide-react';
 import { ABOUT_DATA } from '../data/portfolioData';
 import { Language } from '../types';
 import { QSiLogo } from './QSiLogo';
 import { Edit3 } from 'lucide-react';
-import { postGuestMessage } from '../services/firebaseService';
+import { postGuestMessage, subscribeGuestMessages, deleteGuestMessage } from '../services/firebaseService';
 
 interface AboutTabProps {
   playClickSound: () => void;
@@ -37,6 +38,8 @@ interface AboutTabProps {
   onOpenAboutManager?: () => void;
   onOpenGuestbook?: () => void;
   isEditMode?: boolean;
+  onSaveAboutData?: (updated: typeof ABOUT_DATA) => void;
+  onResetAboutData?: () => void;
 }
 
 interface MessageLogItem {
@@ -70,9 +73,230 @@ export const AboutTab: React.FC<AboutTabProps> = ({
   aboutData,
   onOpenAboutManager,
   onOpenGuestbook,
-  isEditMode = false
+  isEditMode = false,
+  onSaveAboutData,
+  onResetAboutData
 }) => {
-  const data = aboutData || ABOUT_DATA;
+  const [localAboutData, setLocalAboutData] = useState<typeof ABOUT_DATA>(aboutData || ABOUT_DATA);
+  const [rawIsInPageEditing, setIsInPageEditing] = useState<boolean>(false);
+  const isInPageEditing = isEditMode || rawIsInPageEditing;
+  const [newTagInput, setNewTagInput] = useState('');
+
+  useEffect(() => {
+    if (aboutData) {
+      setLocalAboutData(aboutData);
+    }
+  }, [aboutData]);
+
+  const data = localAboutData;
+
+  const updateAboutField = (updater: (prev: typeof ABOUT_DATA) => typeof ABOUT_DATA) => {
+    setLocalAboutData((prev) => {
+      const next = updater(prev);
+      if (onSaveAboutData) {
+        onSaveAboutData(next);
+      } else {
+        try {
+          localStorage.setItem('qsi_custom_about_data', JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
+  };
+
+  const handleAddCustomSection = () => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const customSections = Array.isArray((prev as any).customSections) ? [...(prev as any).customSections] : [];
+      const newSec = {
+        id: `sec-${Date.now()}`,
+        title: `自定义 DIV 模块 ${customSections.length + 1}`,
+        items: [
+          {
+            id: `item-${Date.now()}-1`,
+            mainTitle: '模块大标题 / 描述名称',
+            content: '请输入详细描述内容...'
+          }
+        ]
+      };
+      return { ...prev, customSections: [...customSections, newSec] };
+    });
+  };
+
+  const handleAddCustomItem = (secIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const customSections = Array.isArray((prev as any).customSections) ? [...(prev as any).customSections] : [];
+      if (!customSections[secIdx]) return prev;
+      const items = Array.isArray(customSections[secIdx].items) ? [...customSections[secIdx].items] : [];
+      items.push({
+        id: `item-${Date.now()}`,
+        mainTitle: '新条目标题',
+        content: '详细说明...'
+      });
+      customSections[secIdx] = { ...customSections[secIdx], items };
+      return { ...prev, customSections };
+    });
+  };
+
+  const handleDeleteCustomItem = (secIdx: number, itemIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const customSections = Array.isArray((prev as any).customSections) ? [...(prev as any).customSections] : [];
+      if (!customSections[secIdx]) return prev;
+      const items = Array.isArray(customSections[secIdx].items) ? [...customSections[secIdx].items] : [];
+      items.splice(itemIdx, 1);
+      customSections[secIdx] = { ...customSections[secIdx], items };
+      return { ...prev, customSections };
+    });
+  };
+
+  const handleDeleteCustomSection = (secIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const customSections = Array.isArray((prev as any).customSections) ? [...(prev as any).customSections] : [];
+      customSections.splice(secIdx, 1);
+      return { ...prev, customSections };
+    });
+  };
+
+  const handleAddSkillTag = () => {
+    if (!newTagInput.trim()) return;
+    playClickSound();
+    updateAboutField((prev) => {
+      const skillTags = Array.isArray(prev.skillTags) ? [...prev.skillTags] : [];
+      skillTags.push(newTagInput.trim());
+      return { ...prev, skillTags };
+    });
+    setNewTagInput('');
+  };
+
+  const handleDeleteSkillTag = (tagIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const skillTags = Array.isArray(prev.skillTags) ? [...prev.skillTags] : [];
+      skillTags.splice(tagIdx, 1);
+      return { ...prev, skillTags };
+    });
+  };
+
+  const handleAddEducation = () => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const education = Array.isArray(prev.education) ? [...prev.education] : [];
+      education.push({
+        year: '2026',
+        degree: '设计学硕士 / M.A.',
+        school: '美术学院',
+        location: '中国',
+        description: '视觉传达与艺术实践研究'
+      });
+      return { ...prev, education };
+    });
+  };
+
+  const handleDeleteEducation = (idx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const education = Array.isArray(prev.education) ? [...prev.education] : [];
+      education.splice(idx, 1);
+      return { ...prev, education };
+    });
+  };
+
+  const handleAddExperience = () => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const experience = Array.isArray(prev.experience) ? [...prev.experience] : [];
+      experience.push({
+        year: '2026',
+        role: '设计总监 / Art Director',
+        company: '齐思设计工作室 QSi Studio',
+        location: '中国',
+        description: '负责品牌重构与艺术展陈...',
+        highlights: ['品牌全案视觉', '展陈艺术主视觉']
+      });
+      return { ...prev, experience };
+    });
+  };
+
+  const handleDeleteExperience = (idx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const experience = Array.isArray(prev.experience) ? [...prev.experience] : [];
+      experience.splice(idx, 1);
+      return { ...prev, experience };
+    });
+  };
+
+  const handleAddAward = () => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const awards = Array.isArray(prev.awards) ? [...prev.awards] : [];
+      awards.push({
+        year: '2026',
+        title: '东方设计大奖 金奖',
+        organization: '国际设计联合会',
+        category: '展陈视觉类'
+      });
+      return { ...prev, awards };
+    });
+  };
+
+  const handleDeleteAward = (idx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const awards = Array.isArray(prev.awards) ? [...prev.awards] : [];
+      awards.splice(idx, 1);
+      return { ...prev, awards };
+    });
+  };
+
+  // Skill Groups editing handlers
+  const handleAddSkillCategoryGroup = () => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const skills = Array.isArray(prev.skills) ? [...prev.skills] : [...ABOUT_DATA.skills];
+      skills.push({
+        category: '新分类组',
+        items: ['技能条目 1']
+      });
+      return { ...prev, skills };
+    });
+  };
+
+  const handleDeleteSkillCategoryGroup = (grpIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const skills = Array.isArray(prev.skills) ? [...prev.skills] : [...ABOUT_DATA.skills];
+      skills.splice(grpIdx, 1);
+      return { ...prev, skills };
+    });
+  };
+
+  const handleAddSkillGroupItem = (grpIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const skills = Array.isArray(prev.skills) ? [...prev.skills] : [...ABOUT_DATA.skills];
+      if (!skills[grpIdx]) return prev;
+      const items = Array.isArray(skills[grpIdx].items) ? [...skills[grpIdx].items] : [];
+      items.push('新专业技能条目');
+      skills[grpIdx] = { ...skills[grpIdx], items };
+      return { ...prev, skills };
+    });
+  };
+
+  const handleDeleteSkillGroupItem = (grpIdx: number, itemIdx: number) => {
+    playClickSound();
+    updateAboutField((prev) => {
+      const skills = Array.isArray(prev.skills) ? [...prev.skills] : [...ABOUT_DATA.skills];
+      if (!skills[grpIdx]) return prev;
+      const items = Array.isArray(skills[grpIdx].items) ? [...skills[grpIdx].items] : [];
+      items.splice(itemIdx, 1);
+      skills[grpIdx] = { ...skills[grpIdx], items };
+      return { ...prev, skills };
+    });
+  };
 
   // Accordion state - DEFAULT ONLY BASIC INFO IS EXPANDED
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -118,37 +342,38 @@ export const AboutTab: React.FC<AboutTabProps> = ({
     }
   };
 
-  // Local Storage Persistent Inbox Messages Log
-  const [inboxMessages, setInboxMessages] = useState<MessageLogItem[]>(() => {
-    const saved = localStorage.getItem('qsi_messages_inbox');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // ignore
-      }
-    }
-    return DEFAULT_MESSAGES;
-  });
+  // Real-time Cloud Guestbook Subscription for Lower Messages Log
+  const [inboxMessages, setInboxMessages] = useState<MessageLogItem[]>([]);
 
-  const saveInbox = (msgs: MessageLogItem[]) => {
-    setInboxMessages(msgs);
-    try {
-      localStorage.setItem('qsi_messages_inbox', JSON.stringify(msgs));
-    } catch (e) {
-      // ignore
-    }
-  };
+  useEffect(() => {
+    const unsubscribe = subscribeGuestMessages((list) => {
+      const formatted: MessageLogItem[] = list.map((msg) => ({
+        id: msg.id || `msg-${Date.now()}`,
+        name: msg.authorName || '匿名访客',
+        email: msg.email || '',
+        message: msg.content || '',
+        date: msg.date || (msg.createdAt?.toDate ? new Date(msg.createdAt.toDate()).toLocaleString('zh-CN', { hour12: false }) : '刚刚'),
+        projectTitle: msg.projectTitle
+      }));
+      setInboxMessages(formatted);
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
 
-  const handleDeleteMessage = (id: string) => {
+  const handleDeleteMessage = async (id: string) => {
     playClickSound();
-    const updated = inboxMessages.filter((m) => m.id !== id);
-    saveInbox(updated);
+    try {
+      await deleteGuestMessage(id);
+    } catch (e) {
+      console.warn('Delete message notice:', e);
+    }
   };
 
   const handleClearInbox = () => {
     playClickSound();
-    saveInbox([]);
+    setInboxMessages([]);
   };
 
   // Skill Tags array for individual icon badges
@@ -206,21 +431,6 @@ export const AboutTab: React.FC<AboutTabProps> = ({
     e.preventDefault();
     playClickSound();
     if (formData.name && formData.email && formData.message) {
-      const nowStr = new Date();
-      const dateFormatted = `${nowStr.getFullYear()}-${String(nowStr.getMonth() + 1).padStart(2, '0')}-${String(nowStr.getDate()).padStart(2, '0')} ${String(nowStr.getHours()).padStart(2, '0')}:${String(nowStr.getMinutes()).padStart(2, '0')}`;
-
-      const newRecord: MessageLogItem = {
-        id: `msg-${Date.now()}`,
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        message: formData.message.trim(),
-        date: dateFormatted
-      };
-
-      const updated = [newRecord, ...inboxMessages];
-      saveInbox(updated);
-
-      // Synchronize directly with Cloud Firestore Guestbook
       try {
         await postGuestMessage({
           authorName: formData.name.trim(),
@@ -228,7 +438,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           content: formData.message.trim()
         });
       } catch (err) {
-        console.warn('Firebase sync notice:', err);
+        console.warn('Post guest message notice:', err);
       }
 
       setFormData({ name: '', email: '', message: '' });
@@ -267,17 +477,32 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           </div>
 
           {/* Action Control Buttons: Edit Profile & Expand/Collapse Toggle */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            {isEditMode && onOpenAboutManager && (
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {isEditMode && (
               <button
                 type="button"
                 onClick={() => {
                   playClickSound();
-                  onOpenAboutManager();
+                  setIsInPageEditing(!isInPageEditing);
+                  if (!isInPageEditing) {
+                    setOpenSections({
+                      profile: true,
+                      bio: true,
+                      skills: true,
+                      education: true,
+                      experience: true,
+                      awards: true,
+                      contact: true
+                    });
+                  }
                 }}
-                className="p-2 rounded-full border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:border-gray-400 dark:hover:border-neutral-600 transition-all cursor-pointer active:scale-95 flex items-center justify-center shrink-0 shadow-2xs"
-                title={language === 'zh' ? '编辑齐思资料' : 'Edit Profile'}
-                id="about-manage-profile-btn"
+                className={`p-2.5 rounded-full border transition-all cursor-pointer flex items-center justify-center shadow-2xs font-bold active:scale-95 ${
+                  isInPageEditing
+                    ? 'bg-amber-500 text-white border-amber-500 ring-2 ring-amber-300 dark:ring-amber-700'
+                    : 'bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-800 text-gray-700 dark:text-neutral-300 hover:text-black dark:hover:text-white'
+                }`}
+                title={isInPageEditing ? (language === 'zh' ? '退出原页编辑' : 'Exit In-Page Edit') : (language === 'zh' ? '原页编辑模式' : 'In-Page Edit Mode')}
+                id="about-toggle-inpage-edit-btn"
               >
                 <Edit3 className="w-4 h-4" />
               </button>
@@ -302,6 +527,52 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           </div>
         </div>
 
+        {/* IN-PAGE EDITING BANNER */}
+        {isInPageEditing && (
+          <div className="p-4 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono shadow-xs animate-fade-in">
+            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <Edit3 className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="font-bold">{language === 'zh' ? '原页实时编辑已开启：支持在原有界面直接修改文字、删除/添加 DIV 模块卡片' : 'In-Page Direct Editing Mode Active'}</span>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+              <button
+                type="button"
+                onClick={handleAddCustomSection}
+                className="p-2 sm:px-2.5 sm:py-1.5 bg-black text-white dark:bg-white dark:text-black font-bold rounded-xl hover:opacity-90 transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs active:scale-95"
+                title={language === 'zh' ? '增加 DIV 模块卡片' : 'Add Custom DIV Card'}
+                id="add-custom-div-card-btn"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-xs font-mono">DIV</span>
+              </button>
+              {onResetAboutData && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    playClickSound();
+                    if (window.confirm(language === 'zh' ? '确定重置为默认齐思资料？' : 'Reset default profile?')) {
+                      onResetAboutData();
+                    }
+                  }}
+                  className="px-3 py-1.5 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-all cursor-pointer"
+                >
+                  {language === 'zh' ? '恢复默认' : 'Reset'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  playClickSound();
+                  setIsInPageEditing(false);
+                }}
+                className="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                {language === 'zh' ? '完成编辑' : 'Finish Editing'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ACCORDION SECTIONS */}
         <div className="space-y-4 font-sans">
           
@@ -315,7 +586,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           >
             <button
               onClick={() => toggleSection('profile')}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
@@ -342,117 +613,176 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
                 >
-                  <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50/50 dark:bg-neutral-950/50">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <QSiLogo className="h-6 w-auto text-black dark:text-white" />
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <h2 className="text-xl font-black text-black dark:text-white">
-                          {data.name}
-                        </h2>
-                        {language === 'zh' && (
-                          <span className="text-xs font-mono text-gray-400 dark:text-neutral-500 font-normal">
-                            {data.englishName}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs font-mono text-gray-600 dark:text-neutral-300 mt-1">
-                        {data.title}
-                      </p>
-                      {language === 'zh' && (
-                        <p className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 mt-0.5">
-                          {data.englishTitle}
-                        </p>
-                      )}
-                      
-                      <div className="mt-4 space-y-1.5 text-xs font-mono text-gray-600 dark:text-neutral-300">
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 dark:text-neutral-500">{language === 'zh' ? '工作地点:' : 'Location:'}</span>
-                          <span className="text-black dark:text-white font-medium">{data.location}</span>
+                  <div className="p-5 sm:p-6 bg-gray-50/50 dark:bg-neutral-950/50">
+                    {isInPageEditing ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/40 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 font-mono">
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">姓名 Name (ZH)</label>
+                          <input
+                            type="text"
+                            value={data.name || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, name: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white font-bold"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 dark:text-neutral-500">{language === 'zh' ? '专业方向:' : 'Focus:'}</span>
-                          <span className="text-black dark:text-white font-medium">{language === 'zh' ? '视觉传达 / 品牌视觉重构' : 'Visual Communication'}</span>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">英文名 English Name</label>
+                          <input
+                            type="text"
+                            value={data.englishName || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, englishName: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
                         </div>
-                      </div>
-                    </div>
-
-                    {/* COMPLETE CONTACT INFO BOX (Email, Phone, WeChat, QQ) - WITHOUT SVG ICONS */}
-                    <div className="bg-white dark:bg-neutral-900 p-4 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2.5 text-xs font-mono">
-                      <div className="text-[10px] text-gray-400 dark:text-neutral-500 uppercase tracking-widest font-semibold pb-1 border-b border-gray-100 dark:border-neutral-800">
-                        {language === 'zh' ? '全域联系方式' : 'CONTACT CHANNELS'}
-                      </div>
-
-                      {/* Email */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 dark:text-neutral-400">
-                          {language === 'zh' ? '邮箱' : 'Email'}:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{data.email}</span>
-                          <button
-                            onClick={() => handleCopy(data.email, 'email')}
-                            className="p-1 hover:text-black dark:hover:text-white text-gray-400"
-                            title="Copy Email"
-                          >
-                            {copiedKey === 'email' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                          </button>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">职位 Title (ZH)</label>
+                          <input
+                            type="text"
+                            value={data.title || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, title: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white font-sans"
+                          />
                         </div>
-                      </div>
-
-                      {/* Phone */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 dark:text-neutral-400">
-                          {language === 'zh' ? '电话' : 'Phone'}:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{data.phone}</span>
-                          <button
-                            onClick={() => handleCopy(data.phone, 'phone')}
-                            className="p-1 hover:text-black dark:hover:text-white text-gray-400"
-                            title="Copy Phone"
-                          >
-                            {copiedKey === 'phone' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                          </button>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">职位 Title (EN)</label>
+                          <input
+                            type="text"
+                            value={data.englishTitle || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, englishTitle: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
                         </div>
-                      </div>
-
-                      {/* WeChat */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 dark:text-neutral-400">
-                          {language === 'zh' ? '微信' : 'WeChat'}:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{data.wechat}</span>
-                          <button
-                            onClick={() => handleCopy(data.wechat, 'wechat')}
-                            className="p-1 hover:text-black dark:hover:text-white text-gray-400"
-                            title="Copy WeChat"
-                          >
-                            {copiedKey === 'wechat' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                          </button>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">工作地点 Location</label>
+                          <input
+                            type="text"
+                            value={data.location || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, location: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">电子邮箱 Email</label>
+                          <input
+                            type="text"
+                            value={data.email || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, email: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">电话 Phone</label>
+                          <input
+                            type="text"
+                            value={data.phone || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, phone: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">微信 WeChat</label>
+                          <input
+                            type="text"
+                            value={data.wechat || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, wechat: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-[11px] text-gray-500 mb-1 font-bold">QQ 号码</label>
+                          <input
+                            type="text"
+                            value={data.qq || ''}
+                            onChange={(e) => updateAboutField((d) => ({ ...d, qq: e.target.value }))}
+                            className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white"
+                          />
                         </div>
                       </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <QSiLogo className="h-6 w-auto text-black dark:text-white" />
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            <h2 className="text-xl font-black text-black dark:text-white">
+                              {data.name}
+                            </h2>
+                            {language === 'zh' && (
+                              <span className="text-xs font-mono text-gray-400 dark:text-neutral-500 font-normal">
+                                {data.englishName}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-mono text-gray-600 dark:text-neutral-300 mt-1">
+                            {data.title}
+                          </p>
+                          {language === 'zh' && (
+                            <p className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 mt-0.5">
+                              {data.englishTitle}
+                            </p>
+                          )}
+                          
+                          <div className="mt-4 space-y-1.5 text-xs font-mono text-gray-600 dark:text-neutral-300">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 dark:text-neutral-500">{language === 'zh' ? '工作地点:' : 'Location:'}</span>
+                              <span className="text-black dark:text-white font-medium">{data.location}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-400 dark:text-neutral-500">{language === 'zh' ? '专业方向:' : 'Focus:'}</span>
+                              <span className="text-black dark:text-white font-medium">{language === 'zh' ? '视觉传达 / 品牌视觉重构' : 'Visual Communication'}</span>
+                            </div>
+                          </div>
+                        </div>
 
-                      {/* QQ */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-500 dark:text-neutral-400">
-                          QQ:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-black dark:text-white font-medium">{data.qq}</span>
-                          <button
-                            onClick={() => handleCopy(data.qq, 'qq')}
-                            className="p-1 hover:text-black dark:hover:text-white text-gray-400"
-                            title="Copy QQ"
-                          >
-                            {copiedKey === 'qq' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                          </button>
+                        {/* COMPLETE CONTACT INFO BOX (Email, Phone, WeChat, QQ) */}
+                        <div className="bg-white dark:bg-neutral-900 p-4 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2.5 text-xs font-mono">
+                          <div className="text-[10px] text-gray-400 dark:text-neutral-500 uppercase tracking-widest font-semibold pb-1 border-b border-gray-100 dark:border-neutral-800">
+                            {language === 'zh' ? '全域联系方式' : 'CONTACT CHANNELS'}
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-neutral-400">{language === 'zh' ? '邮箱' : 'Email'}:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-black dark:text-white font-medium">{data.email}</span>
+                              <button onClick={() => handleCopy(data.email, 'email')} className="p-1 hover:text-black dark:hover:text-white text-gray-400 cursor-pointer" title="Copy Email">
+                                {copiedKey === 'email' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-neutral-400">{language === 'zh' ? '电话' : 'Phone'}:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-black dark:text-white font-medium">{data.phone}</span>
+                              <button onClick={() => handleCopy(data.phone, 'phone')} className="p-1 hover:text-black dark:hover:text-white text-gray-400 cursor-pointer" title="Copy Phone">
+                                {copiedKey === 'phone' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-neutral-400">{language === 'zh' ? '微信' : 'WeChat'}:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-black dark:text-white font-medium">{data.wechat}</span>
+                              <button onClick={() => handleCopy(data.wechat, 'wechat')} className="p-1 hover:text-black dark:hover:text-white text-gray-400 cursor-pointer" title="Copy WeChat">
+                                {copiedKey === 'wechat' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-500 dark:text-neutral-400">QQ:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-black dark:text-white font-medium">{data.qq}</span>
+                              <button onClick={() => handleCopy(data.qq, 'qq')} className="p-1 hover:text-black dark:hover:text-white text-gray-400 cursor-pointer" title="Copy QQ">
+                                {copiedKey === 'qq' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
-
-                    </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -469,7 +799,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           >
             <button
               onClick={() => toggleSection('bio')}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
@@ -497,17 +827,77 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                   className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
                 >
                   <div className="p-5 sm:p-6 space-y-4">
-                    <div className="p-4 bg-black dark:bg-white text-white dark:text-black rounded-xl space-y-1">
-                      {(Array.isArray(data.manifesto) ? data.manifesto : [data.manifesto]).map((line, idx) => (
-                        <p key={idx} className="text-xs sm:text-sm font-serif italic">
-                          {line}
-                        </p>
-                      ))}
-                    </div>
+                    {isInPageEditing ? (
+                      <div className="space-y-4 bg-amber-50/30 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800/60">
+                        <div className="space-y-2">
+                          <label className="block text-xs font-mono font-bold text-amber-900 dark:text-amber-200">编辑设计宣言 (Manifesto Lines)</label>
+                          {(Array.isArray(data.manifesto) ? data.manifesto : [data.manifesto]).map((line, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={line}
+                                onChange={(e) => {
+                                  const arr = Array.isArray(data.manifesto) ? [...data.manifesto] : [data.manifesto];
+                                  arr[idx] = e.target.value;
+                                  updateAboutField((d) => ({ ...d, manifesto: arr }));
+                                }}
+                                className="flex-1 p-2 text-xs bg-black text-white dark:bg-white dark:text-black font-serif italic rounded-lg"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const arr = Array.isArray(data.manifesto) ? [...data.manifesto] : [data.manifesto];
+                                  arr.splice(idx, 1);
+                                  updateAboutField((d) => ({ ...d, manifesto: arr }));
+                                }}
+                                className="p-1.5 text-red-500 hover:text-red-700 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const arr = Array.isArray(data.manifesto) ? [...data.manifesto] : [data.manifesto];
+                              arr.push('新设计宣言金句...');
+                              updateAboutField((d) => ({ ...d, manifesto: arr }));
+                            }}
+                            className="mt-1 text-xs font-mono text-amber-600 dark:text-amber-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>新增宣言句子</span>
+                          </button>
+                        </div>
 
-                    <p className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300 leading-relaxed font-sans">
-                      {data.bio}
-                    </p>
+                        <div>
+                          <label className="block text-xs font-mono font-bold text-amber-900 dark:text-amber-200 mb-1">编辑个人 / 工作室长篇简介 (Bio)</label>
+                          <textarea
+                            rows={5}
+                            value={Array.isArray(data.bio) ? data.bio.join('\n') : (data.bio || '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              updateAboutField((d) => ({ ...d, bio: val.includes('\n') ? val.split('\n') : val }));
+                            }}
+                            className="w-full p-3 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-xl text-black dark:text-white leading-relaxed font-sans"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-black dark:bg-white text-white dark:text-black rounded-xl space-y-1">
+                          {(Array.isArray(data.manifesto) ? data.manifesto : [data.manifesto]).map((line, idx) => (
+                            <p key={idx} className="text-xs sm:text-sm font-serif italic">
+                              {line}
+                            </p>
+                          ))}
+                        </div>
+
+                        <p className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300 leading-relaxed font-sans whitespace-pre-wrap">
+                          {Array.isArray(data.bio) ? data.bio.join('\n\n') : data.bio}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -524,7 +914,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           >
             <button
               onClick={() => toggleSection('skills')}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
@@ -554,39 +944,150 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                   <div className="p-5 sm:p-6 space-y-6">
                     {/* Individual Icon Tag Chips */}
                     <div>
-                      <span className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-widest block mb-3">
+                      <span className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-widest block mb-3 font-bold">
                         {language === 'zh' ? '核心技能标签' : 'CAPABILITY TAGS'}
                       </span>
                       <div className="flex flex-wrap gap-2">
-                        {(data.skillTags || skillTagList).map((tag, idx) => (
+                        {(data.skillTags || skillTagList.map((t) => t.name)).map((tag, idx) => (
                           <div
                             key={idx}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-neutral-800 text-black dark:text-white border border-gray-300 dark:border-neutral-700 hover:border-black dark:hover:border-white transition-all text-xs font-mono shadow-2xs group rounded-xl"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white group-hover:bg-amber-500" />
-                            <span className="font-bold">{tag.name}</span>
+                            <span className="font-bold">{typeof tag === 'string' ? tag : (tag as any).name}</span>
+                            {isInPageEditing && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSkillTag(idx)}
+                                className="text-red-500 hover:text-red-700 font-bold ml-1 cursor-pointer"
+                                title="删除此标签"
+                              >
+                                ×
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
+
+                      {isInPageEditing && (
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-amber-200 dark:border-amber-800/50">
+                          <input
+                            type="text"
+                            value={newTagInput}
+                            onChange={(e) => setNewTagInput(e.target.value)}
+                            placeholder="输入新技能标签 (如: C4D, 展陈艺术)"
+                            className="p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-lg text-black dark:text-white font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddSkillTag}
+                            className="px-3 py-2 text-xs bg-black text-white dark:bg-white dark:text-black font-bold rounded-lg cursor-pointer flex items-center gap-1"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>添加技能标签</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Grouped Category Breakdown */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gray-100 dark:border-neutral-800">
-                      {(data.skills || ABOUT_DATA.skills).map((grp, idx) => (
-                        <div key={idx} className="p-4 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl">
-                          <h4 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider mb-2 font-mono">
-                            {grp.category}
-                          </h4>
-                          <ul className="space-y-1 text-xs text-gray-600 dark:text-neutral-400 font-sans">
-                            {grp.items.map((item, i) => (
-                              <li key={i} className="flex items-center gap-1.5">
-                                <span className="w-1 h-1 bg-black dark:bg-white rounded-full" />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
+                    <div className="pt-2 border-t border-gray-100 dark:border-neutral-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono text-gray-400 dark:text-neutral-500 uppercase tracking-widest block font-bold">
+                          {language === 'zh' ? '分类技能与专业领域' : 'SKILL CATEGORY GROUPS'}
+                        </span>
+                        {isInPageEditing && (
+                          <button
+                            type="button"
+                            onClick={handleAddSkillCategoryGroup}
+                            className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{language === 'zh' ? '新增技能分类组' : 'Add Category Group'}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {(data.skills || ABOUT_DATA.skills).map((grp, grpIdx) => (
+                          <div key={grpIdx} className="p-4 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2.5">
+                            {isInPageEditing ? (
+                              <div className="space-y-2.5 font-mono">
+                                <div className="flex items-center justify-between gap-2">
+                                  <input
+                                    type="text"
+                                    value={grp.category || ''}
+                                    onChange={(e) => {
+                                      const skills = Array.isArray(data.skills) ? [...data.skills] : [...ABOUT_DATA.skills];
+                                      skills[grpIdx] = { ...skills[grpIdx], category: e.target.value };
+                                      updateAboutField((d) => ({ ...d, skills }));
+                                    }}
+                                    placeholder="分类名称"
+                                    className="p-1.5 text-xs font-bold bg-white dark:bg-neutral-900 border border-amber-300 dark:border-amber-700 rounded-md text-black dark:text-white flex-1"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSkillCategoryGroup(grpIdx)}
+                                    className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                    title="删除此分类组"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  {(grp.items || []).map((item, itemIdx) => (
+                                    <div key={itemIdx} className="flex items-center gap-1.5">
+                                      <input
+                                        type="text"
+                                        value={item}
+                                        onChange={(e) => {
+                                          const skills = Array.isArray(data.skills) ? [...data.skills] : [...ABOUT_DATA.skills];
+                                          const items = [...(skills[grpIdx].items || [])];
+                                          items[itemIdx] = e.target.value;
+                                          skills[grpIdx] = { ...skills[grpIdx], items };
+                                          updateAboutField((d) => ({ ...d, skills }));
+                                        }}
+                                        className="p-1 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md text-black dark:text-white flex-1 font-sans"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteSkillGroupItem(grpIdx, itemIdx)}
+                                        className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                        title="删除条目"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddSkillGroupItem(grpIdx)}
+                                    className="mt-1 text-[11px] text-amber-600 dark:text-amber-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>添加条目</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <h4 className="text-xs font-bold text-black dark:text-white uppercase tracking-wider mb-2 font-mono">
+                                  {grp.category}
+                                </h4>
+                                <ul className="space-y-1 text-xs text-gray-600 dark:text-neutral-400 font-sans">
+                                  {(grp.items || []).map((item, i) => (
+                                    <li key={i} className="flex items-center gap-1.5">
+                                      <span className="w-1 h-1 bg-black dark:bg-white rounded-full" />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -604,7 +1105,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           >
             <button
               onClick={() => toggleSection('education')}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
@@ -634,19 +1135,104 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                   <div className="p-5 sm:p-6 space-y-3">
                     {(data.education || []).map((edu, idx) => (
                       <div key={idx} className="p-4 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <span className="text-[10px] font-mono bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 self-start font-bold rounded-md">
-                            {edu.year}
-                          </span>
-                          <span className="text-xs font-mono text-gray-400 dark:text-neutral-500">{edu.location}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-black dark:text-white font-sans">{edu.degree}</h4>
-                        <p className="text-xs font-mono text-gray-600 dark:text-neutral-400">{edu.school}</p>
-                        {edu.description && (
-                          <p className="text-xs text-gray-500 dark:text-neutral-400 font-sans">{edu.description}</p>
+                        {isInPageEditing ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={edu.year || ''}
+                                onChange={(e) => {
+                                  const list = [...(data.education || [])];
+                                  list[idx] = { ...list[idx], year: e.target.value };
+                                  updateAboutField((d) => ({ ...d, education: list }));
+                                }}
+                                placeholder="年份 (如 2026)"
+                                className="w-24 p-1.5 text-xs bg-black text-white dark:bg-white dark:text-black font-bold rounded-md"
+                              />
+                              <input
+                                type="text"
+                                value={edu.location || ''}
+                                onChange={(e) => {
+                                  const list = [...(data.education || [])];
+                                  list[idx] = { ...list[idx], location: e.target.value };
+                                  updateAboutField((d) => ({ ...d, education: list }));
+                                }}
+                                placeholder="地点"
+                                className="flex-1 p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md"
+                              />
+                            </div>
+                            <div className="flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEducation(idx)}
+                                className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 font-mono font-bold cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>删除卡片</span>
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={edu.degree || ''}
+                              onChange={(e) => {
+                                const list = [...(data.education || [])];
+                                list[idx] = { ...list[idx], degree: e.target.value };
+                                updateAboutField((d) => ({ ...d, education: list }));
+                              }}
+                              placeholder="学位 / 专业名称"
+                              className="w-full p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-sans font-bold"
+                            />
+                            <input
+                              type="text"
+                              value={edu.school || ''}
+                              onChange={(e) => {
+                                const list = [...(data.education || [])];
+                                list[idx] = { ...list[idx], school: e.target.value };
+                                updateAboutField((d) => ({ ...d, education: list }));
+                              }}
+                              placeholder="学校 / 机构"
+                              className="w-full p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-mono"
+                            />
+                            <input
+                              type="text"
+                              value={edu.description || ''}
+                              onChange={(e) => {
+                                const list = [...(data.education || [])];
+                                list[idx] = { ...list[idx], description: e.target.value };
+                                updateAboutField((d) => ({ ...d, education: list }));
+                              }}
+                              placeholder="描述简述..."
+                              className="sm:col-span-2 w-full p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-sans"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                              <span className="text-[10px] font-mono bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 self-start font-bold rounded-md">
+                                {edu.year}
+                              </span>
+                              <span className="text-xs font-mono text-gray-400 dark:text-neutral-500">{edu.location}</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-black dark:text-white font-sans">{edu.degree}</h4>
+                            <p className="text-xs font-mono text-gray-600 dark:text-neutral-400">{edu.school}</p>
+                            {edu.description && (
+                              <p className="text-xs text-gray-500 dark:text-neutral-400 font-sans">{edu.description}</p>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
+
+                    {isInPageEditing && (
+                      <button
+                        type="button"
+                        onClick={handleAddEducation}
+                        className="w-full p-2.5 border border-dashed border-gray-300 dark:border-neutral-700 hover:border-black dark:hover:border-white rounded-xl text-xs font-mono font-bold text-black dark:text-white flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>新增教育卡片</span>
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -663,7 +1249,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           >
             <button
               onClick={() => toggleSection('experience')}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
@@ -693,17 +1279,102 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                   <div className="p-5 sm:p-6 space-y-4">
                     {(data.experience || []).map((exp, idx) => (
                       <div key={idx} className="p-4 bg-white dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <span className="text-[10px] font-mono bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 self-start rounded-md">
-                            {exp.year}
-                          </span>
-                          <span className="text-xs font-mono text-gray-400 dark:text-neutral-500">{exp.location}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-black dark:text-white font-sans">{exp.role}</h4>
-                        <p className="text-xs font-mono text-gray-600 dark:text-neutral-400">{exp.company}</p>
-                        <p className="text-xs text-gray-500 dark:text-neutral-400 font-sans">{exp.description}</p>
+                        {isInPageEditing ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={exp.year || ''}
+                                onChange={(e) => {
+                                  const list = [...(data.experience || [])];
+                                  list[idx] = { ...list[idx], year: e.target.value };
+                                  updateAboutField((d) => ({ ...d, experience: list }));
+                                }}
+                                placeholder="年份"
+                                className="w-24 p-1.5 text-xs bg-black text-white dark:bg-white dark:text-black font-bold rounded-md"
+                              />
+                              <input
+                                type="text"
+                                value={exp.location || ''}
+                                onChange={(e) => {
+                                  const list = [...(data.experience || [])];
+                                  list[idx] = { ...list[idx], location: e.target.value };
+                                  updateAboutField((d) => ({ ...d, experience: list }));
+                                }}
+                                placeholder="地点"
+                                className="flex-1 p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md"
+                              />
+                            </div>
+                            <div className="flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteExperience(idx)}
+                                className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 font-mono font-bold cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>删除卡片</span>
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={exp.role || ''}
+                              onChange={(e) => {
+                                const list = [...(data.experience || [])];
+                                list[idx] = { ...list[idx], role: e.target.value };
+                                updateAboutField((d) => ({ ...d, experience: list }));
+                              }}
+                              placeholder="职位 / 角色"
+                              className="w-full p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-sans font-bold"
+                            />
+                            <input
+                              type="text"
+                              value={exp.company || ''}
+                              onChange={(e) => {
+                                const list = [...(data.experience || [])];
+                                list[idx] = { ...list[idx], company: e.target.value };
+                                updateAboutField((d) => ({ ...d, experience: list }));
+                              }}
+                              placeholder="公司 / 工作室"
+                              className="w-full p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-mono"
+                            />
+                            <input
+                              type="text"
+                              value={exp.description || ''}
+                              onChange={(e) => {
+                                const list = [...(data.experience || [])];
+                                list[idx] = { ...list[idx], description: e.target.value };
+                                updateAboutField((d) => ({ ...d, experience: list }));
+                              }}
+                              placeholder="履历核心描述..."
+                              className="sm:col-span-2 w-full p-1.5 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-sans"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                              <span className="text-[10px] font-mono bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 self-start rounded-md font-bold">
+                                {exp.year}
+                              </span>
+                              <span className="text-xs font-mono text-gray-400 dark:text-neutral-500">{exp.location}</span>
+                            </div>
+                            <h4 className="text-sm font-bold text-black dark:text-white font-sans">{exp.role}</h4>
+                            <p className="text-xs font-mono text-gray-600 dark:text-neutral-400">{exp.company}</p>
+                            <p className="text-xs text-gray-500 dark:text-neutral-400 font-sans">{exp.description}</p>
+                          </>
+                        )}
                       </div>
                     ))}
+
+                    {isInPageEditing && (
+                      <button
+                        type="button"
+                        onClick={handleAddExperience}
+                        className="w-full p-2.5 border border-dashed border-gray-300 dark:border-neutral-700 hover:border-black dark:hover:border-white rounded-xl text-xs font-mono font-bold text-black dark:text-white flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>新增工作履历卡片</span>
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -720,7 +1391,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({
           >
             <button
               onClick={() => toggleSection('awards')}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
@@ -751,22 +1422,80 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                     {(data.awards || []).map((award, idx) => (
                       <div
                         key={idx}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl gap-1"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-neutral-800 rounded-xl gap-2"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-black dark:text-white">{award.year}</span>
-                          <span className="text-gray-800 dark:text-neutral-200 font-sans font-medium">{award.title}</span>
-                        </div>
-                        <span className="text-gray-500 dark:text-neutral-400 text-[11px]">{award.category}</span>
+                        {isInPageEditing ? (
+                          <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
+                            <input
+                              type="text"
+                              value={award.year || ''}
+                              onChange={(e) => {
+                                const list = [...(data.awards || [])];
+                                list[idx] = { ...list[idx], year: e.target.value };
+                                updateAboutField((d) => ({ ...d, awards: list }));
+                              }}
+                              placeholder="年份"
+                              className="w-20 p-1.5 bg-black text-white dark:bg-white dark:text-black font-bold rounded-md"
+                            />
+                            <input
+                              type="text"
+                              value={award.title || ''}
+                              onChange={(e) => {
+                                const list = [...(data.awards || [])];
+                                list[idx] = { ...list[idx], title: e.target.value };
+                                updateAboutField((d) => ({ ...d, awards: list }));
+                              }}
+                              placeholder="奖项 / 展览名称"
+                              className="flex-1 p-1.5 bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md font-sans font-bold"
+                            />
+                            <input
+                              type="text"
+                              value={award.category || ''}
+                              onChange={(e) => {
+                                const list = [...(data.awards || [])];
+                                list[idx] = { ...list[idx], category: e.target.value };
+                                updateAboutField((d) => ({ ...d, awards: list }));
+                              }}
+                              placeholder="类别"
+                              className="w-28 p-1.5 bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md text-[11px]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAward(idx)}
+                              className="p-1.5 text-red-500 hover:text-red-700 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-black dark:text-white">{award.year}</span>
+                              <span className="text-gray-800 dark:text-neutral-200 font-sans font-medium">{award.title}</span>
+                            </div>
+                            <span className="text-gray-500 dark:text-neutral-400 text-[11px]">{award.category}</span>
+                          </>
+                        )}
                       </div>
                     ))}
+
+                    {isInPageEditing && (
+                      <button
+                        type="button"
+                        onClick={handleAddAward}
+                        className="w-full p-2.5 border border-dashed border-gray-300 dark:border-neutral-700 hover:border-black dark:hover:border-white rounded-xl text-xs font-mono font-bold text-black dark:text-white flex items-center justify-center gap-1 cursor-pointer mt-2"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>新增获奖荣誉行</span>
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
 
-          {/* DYNAMIC CUSTOM SECTIONS CARDS */}
+          {/* DYNAMIC CUSTOM SECTIONS / DIV 卡片 ("dvi/div 标记部分增加进编辑功能") */}
           {((data as any).customSections || []).map((cSec: any, cIdx: number) => {
             const secKey = `custom_${cSec.id || cIdx}`;
             const isOpen = openSections[secKey] !== false; // Default open
@@ -778,27 +1507,57 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-30px' }}
                 transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 * cIdx }}
-                className="border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 rounded-2xl overflow-hidden shadow-2xs"
+                className="border border-amber-300 dark:border-amber-800 bg-white dark:bg-neutral-900 rounded-2xl overflow-hidden shadow-2xs"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleSection(secKey)}
-                  className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-gray-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
-                      <span>{String(7 + cIdx).padStart(2, '0')}. {cSec.title || '自定义卡片'}</span>
-                      <span className="text-[10px] font-mono font-normal text-gray-400 dark:text-neutral-500 uppercase tracking-widest">
-                        CUSTOM CARD
+                <div className="p-4 sm:p-5 flex items-center justify-between border-b border-gray-100 dark:border-neutral-800 bg-amber-50/20 dark:bg-amber-950/20">
+                  <div className="flex items-center gap-3 flex-1 mr-2">
+                    {isInPageEditing ? (
+                      <input
+                        type="text"
+                        value={cSec.title || ''}
+                        onChange={(e) => {
+                          const list = [...((data as any).customSections || [])];
+                          list[cIdx] = { ...list[cIdx], title: e.target.value };
+                          updateAboutField((d) => ({ ...d, customSections: list }));
+                        }}
+                        placeholder="自定义 DIV 模块标题"
+                        className="p-1.5 text-sm font-bold bg-white dark:bg-neutral-900 border border-amber-300 dark:border-amber-700 rounded-lg text-black dark:text-white w-full max-w-md font-sans"
+                      />
+                    ) : (
+                      <span className="text-sm sm:text-base font-bold text-black dark:text-white uppercase tracking-wide flex items-baseline gap-2">
+                        <span>{String(7 + cIdx).padStart(2, '0')}. {cSec.title || '自定义 DIV 卡片'}</span>
+                        <span className="text-[10px] font-mono font-normal text-amber-600 dark:text-amber-400 uppercase tracking-widest">
+                          CUSTOM DIV CARD
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </div>
-                  <ChevronDown
-                    className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${
-                      isOpen ? 'rotate-180 text-black dark:text-white' : ''
-                    }`}
-                  />
-                </button>
+
+                  <div className="flex items-center gap-2">
+                    {isInPageEditing && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomSection(cIdx)}
+                        className="px-2.5 py-1 text-xs font-mono text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/60 rounded-lg flex items-center gap-1 cursor-pointer"
+                        title="删除整个 DIV 模块"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>删除模块</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(secKey)}
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <ChevronDown
+                        className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${
+                          isOpen ? 'rotate-180 text-black dark:text-white' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
 
                 <AnimatePresence>
                   {isOpen && (
@@ -806,27 +1565,81 @@ export const AboutTab: React.FC<AboutTabProps> = ({
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
+                      className="overflow-hidden"
                     >
                       <div className="p-5 sm:p-6 space-y-4 font-sans">
                         {(cSec.items || []).map((item: any, itemIdx: number) => (
                           <div
                             key={item.id || itemIdx}
-                            className="p-4 bg-gray-50/80 dark:bg-neutral-950/80 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2"
+                            className="p-4 bg-gray-50/80 dark:bg-neutral-950/80 border border-gray-200 dark:border-neutral-800 rounded-xl space-y-2 relative group"
                           >
-                            {item.mainTitle && (
-                              <h4 className="text-sm font-bold text-black dark:text-white font-sans flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white" />
-                                <span>{item.mainTitle}</span>
-                              </h4>
-                            )}
-                            {item.content && (
-                              <p className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300 leading-relaxed font-sans whitespace-pre-wrap pl-3 border-l-2 border-gray-300 dark:border-neutral-700">
-                                {item.content}
-                              </p>
+                            {isInPageEditing ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <input
+                                    type="text"
+                                    value={item.mainTitle || ''}
+                                    onChange={(e) => {
+                                      const secList = [...((data as any).customSections || [])];
+                                      const items = [...(secList[cIdx].items || [])];
+                                      items[itemIdx] = { ...items[itemIdx], mainTitle: e.target.value };
+                                      secList[cIdx] = { ...secList[cIdx], items };
+                                      updateAboutField((d) => ({ ...d, customSections: secList }));
+                                    }}
+                                    placeholder="条目主标题"
+                                    className="p-1.5 text-xs font-bold bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md text-black dark:text-white flex-1"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCustomItem(cIdx, itemIdx)}
+                                    className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                    title="删除此条目"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <textarea
+                                  rows={3}
+                                  value={item.content || ''}
+                                  onChange={(e) => {
+                                    const secList = [...((data as any).customSections || [])];
+                                    const items = [...(secList[cIdx].items || [])];
+                                    items[itemIdx] = { ...items[itemIdx], content: e.target.value };
+                                    secList[cIdx] = { ...secList[cIdx], items };
+                                    updateAboutField((d) => ({ ...d, customSections: secList }));
+                                  }}
+                                  placeholder="条目详细内容阐述..."
+                                  className="w-full p-2 text-xs bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md text-black dark:text-white font-sans"
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                {item.mainTitle && (
+                                  <h4 className="text-sm font-bold text-black dark:text-white font-sans flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white" />
+                                    <span>{item.mainTitle}</span>
+                                  </h4>
+                                )}
+                                {item.content && (
+                                  <p className="text-xs sm:text-sm text-gray-700 dark:text-neutral-300 leading-relaxed font-sans whitespace-pre-wrap pl-3 border-l-2 border-amber-400 dark:border-amber-600">
+                                    {item.content}
+                                  </p>
+                                )}
+                              </>
                             )}
                           </div>
                         ))}
+
+                        {isInPageEditing && (
+                          <button
+                            type="button"
+                            onClick={() => handleAddCustomItem(cIdx)}
+                            className="w-full p-2 border border-dashed border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-xl text-xs font-mono font-bold text-amber-900 dark:text-amber-200 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>新增条目内容</span>
+                          </button>
+                        )}
                       </div>
                     </motion.div>
                   )}

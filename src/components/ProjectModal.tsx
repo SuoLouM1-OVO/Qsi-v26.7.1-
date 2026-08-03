@@ -778,6 +778,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                     </span>
                   ))}
                 </div>
+
+
               </>
             )}
 

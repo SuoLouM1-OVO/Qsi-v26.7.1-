@@ -13,11 +13,18 @@ import { ProjectModal } from './components/ProjectModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
 import { AboutManagerModal } from './components/AboutManagerModal';
 import { GuestbookModal } from './components/GuestbookModal';
+import { SyncManagerModal } from './components/SyncManagerModal';
 import { CustomCursor } from './components/CustomCursor';
 import { IntroLoader } from './components/IntroLoader';
 import { PROJECTS as INITIAL_DEFAULT_PROJECTS, ABOUT_DATA as INITIAL_ABOUT_DATA } from './data/portfolioData';
 import { TabType, Project, Language } from './types';
 import { soundSynth } from './utils/sound';
+import {
+  fetchServerSyncData,
+  pushServerSyncData,
+  saveLocalSnapshot,
+  getLocalSnapshot
+} from './services/serverSyncService';
 import {
   subscribeCloudProjects,
   syncProjectsToCloud,
@@ -54,7 +61,10 @@ export default function App() {
     return INITIAL_DEFAULT_PROJECTS;
   });
 
-  const [cloudLikes, setCloudLikes] = useState<Record<string, number>>({});
+  const [cloudLikes, setCloudLikes] = useState<Record<string, number>>(() => {
+    const local = getLocalSnapshot();
+    return local?.likes || {};
+  });
 
   // Dynamic About QSi Data State
   const [aboutData, setAboutData] = useState<typeof INITIAL_ABOUT_DATA>(() => {
@@ -71,15 +81,47 @@ export default function App() {
   });
 
   const [isAboutManagerOpen, setIsAboutManagerOpen] = useState(false);
+  const [isSyncManagerOpen, setIsSyncManagerOpen] = useState(false);
 
-  // Real-time Cloud Sync Effect
+  // Initial & Periodic Server API Sync Effect (For China & Cloudflare Direct Sync)
+  useEffect(() => {
+    const doSync = () => {
+      fetchServerSyncData().then((serverData) => {
+        if (serverData) {
+          if (Array.isArray(serverData.projects) && serverData.projects.length > 0) {
+            setProjects(serverData.projects);
+            saveLocalSnapshot({ projects: serverData.projects });
+          }
+          if (serverData.aboutData) {
+            setAboutData(serverData.aboutData);
+            saveLocalSnapshot({ aboutData: serverData.aboutData });
+          }
+          if (serverData.likes) {
+            setCloudLikes(serverData.likes);
+          }
+        }
+      }).catch((err) => {
+        console.warn('Server sync notice:', err);
+      });
+    };
+
+    doSync();
+    // Low frequency background polling (10s) for China devices without VPN
+    const interval = setInterval(doSync, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Real-time Cloud Sync Effect (Firebase Firestore)
   useEffect(() => {
     const unsubProjects = subscribeCloudProjects((cloudList) => {
-      if (cloudList && cloudList.length > 0) {
+      console.log('[App.tsx] Real-time Cloud Projects updated. Count:', cloudList?.length);
+      if (Array.isArray(cloudList) && cloudList.length > 0) {
         setProjects(cloudList);
+        saveLocalSnapshot({ projects: cloudList });
       }
     }, () => {
       // Seed default projects to cloud if empty
+      console.log('[App.tsx] Seeding initial default projects to Cloud Firestore');
       syncProjectsToCloud(INITIAL_DEFAULT_PROJECTS);
     });
 
@@ -107,6 +149,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    pushServerSyncData({ aboutData: updated }).catch((e) => console.warn(e));
     syncAboutDataToCloud(updated).catch((e) => console.error('Cloud sync about data err:', e));
   };
 
@@ -117,6 +160,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    pushServerSyncData({ aboutData: INITIAL_ABOUT_DATA }).catch((e) => console.warn(e));
     syncAboutDataToCloud(INITIAL_ABOUT_DATA).catch((e) => console.error('Cloud reset about data err:', e));
   };
 
@@ -131,9 +175,13 @@ export default function App() {
     setProjects(newProjects);
     try {
       localStorage.setItem('qsi_custom_projects', JSON.stringify(newProjects));
+      localStorage.setItem('qsi_has_saved_projects', 'true');
     } catch (e) {
       // ignore
     }
+
+    saveLocalSnapshot({ projects: newProjects });
+    pushServerSyncData({ projects: newProjects }).catch((e) => console.warn(e));
 
     // Delete removed items from Cloud Firestore so they don't reappear on real-time sync
     removedProjects.forEach((p) => {
@@ -151,6 +199,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
+    pushServerSyncData({ projects: INITIAL_DEFAULT_PROJECTS }).catch((e) => console.warn(e));
     syncProjectsToCloud(INITIAL_DEFAULT_PROJECTS).catch((e) => console.error('Cloud reset err:', e));
   };
 
@@ -186,46 +235,29 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Global Likes State Management (+1 increment only, merged with Cloud Likes)
-  const [userLikeDeltas, setUserLikeDeltas] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('qsi_user_like_deltas');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // ignore
-      }
-    }
-    return {};
-  });
-
-  // Calculate current effective likes map
+  // Calculate current effective likes map (base project likes + synced cloud likes)
   const likesMap = React.useMemo(() => {
     const map: Record<string, number> = {};
     projects.forEach((p) => {
       const base = typeof p.likes === 'number' ? p.likes : 12;
       const cLikes = cloudLikes[p.id] || 0;
-      const localDelta = userLikeDeltas[p.id] || 0;
-      map[p.id] = base + cLikes + localDelta;
+      map[p.id] = base + cLikes;
     });
     return map;
-  }, [projects, cloudLikes, userLikeDeltas]);
+  }, [projects, cloudLikes]);
 
   const handleIncrementLike = (projectId: string) => {
-    setUserLikeDeltas((prev) => {
+    // 1. Optimistic local increment (+1) for instant 0ms user feedback
+    setCloudLikes((prev) => {
       const updated = {
         ...prev,
         [projectId]: (prev[projectId] || 0) + 1
       };
-      try {
-        localStorage.setItem('qsi_user_like_deltas', JSON.stringify(updated));
-      } catch (e) {
-        // ignore
-      }
+      saveLocalSnapshot({ likes: updated });
       return updated;
     });
 
-    // Also sync to Cloud Firestore
+    // 2. Sync to Cloud Firestore
     incrementCloudLike(projectId).catch((err) => console.error('Cloud like error:', err));
   };
 
@@ -321,6 +353,10 @@ export default function App() {
           setGuestbookPreselectId('');
           setIsGuestbookOpen(true);
         }}
+        onOpenSyncManager={() => {
+          playClickSound();
+          setIsSyncManagerOpen(true);
+        }}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}
       />
@@ -330,6 +366,7 @@ export default function App() {
         {/* HOME SECTION */}
         <section id="home" className="relative z-20 scroll-mt-20">
           <HomeTab
+            projects={projects}
             onSelectProject={(project) => {
               playClickSound();
               setSelectedProject(project);
@@ -339,6 +376,7 @@ export default function App() {
             language={language}
             isIntroReady={isIntroReady}
             likesMap={likesMap}
+            onIncrementLike={handleIncrementLike}
           />
         </section>
 
@@ -351,6 +389,8 @@ export default function App() {
             onOpenAboutManager={() => setIsAboutManagerOpen(true)}
             onOpenGuestbook={() => setIsGuestbookOpen(true)}
             isEditMode={isEditMode}
+            onSaveAboutData={handleSaveAboutData}
+            onResetAboutData={handleResetAboutData}
           />
         </section>
 
@@ -371,6 +411,7 @@ export default function App() {
               setIsProjectManagerOpen(true);
             }}
             isEditMode={isEditMode}
+            onSaveProjects={handleSaveProjects}
           />
         </section>
       </main>
@@ -451,6 +492,28 @@ export default function App() {
         onResetAboutData={handleResetAboutData}
         playClickSound={playClickSound}
         language={language}
+      />
+
+      {/* DATA SYNC & CHINA ACCELERATION MODAL */}
+      <SyncManagerModal
+        isOpen={isSyncManagerOpen}
+        onClose={() => setIsSyncManagerOpen(false)}
+        language={language}
+        onDataReload={(reloadedData) => {
+          if (reloadedData.projects && reloadedData.projects.length > 0) {
+            setProjects(reloadedData.projects);
+          }
+          if (reloadedData.aboutData) {
+            setAboutData(reloadedData.aboutData);
+          }
+          if (reloadedData.likes) {
+            setCloudLikes(reloadedData.likes);
+          }
+        }}
+        onResetDefaults={() => {
+          handleResetProjects();
+          handleResetAboutData();
+        }}
       />
 
       {/* INITIALIZATION INTRO LOADER */}

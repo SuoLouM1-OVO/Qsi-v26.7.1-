@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Menu, X, Home, FolderKanban, User, Check, Moon, ChevronRight, ChevronLeft, History, Tag, Trash2, ArrowRight, Sparkles, MessageSquare, Settings, Lock, Unlock, ShieldCheck, KeyRound } from 'lucide-react';
+import { Search, Menu, X, Home, FolderKanban, User, Check, Moon, ChevronRight, ChevronLeft, History, Tag, Trash2, ArrowRight, Sparkles, MessageSquare, Settings, Lock, Unlock, ShieldCheck, KeyRound, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TabType, Language, Project } from '../types';
 
@@ -16,6 +16,7 @@ interface HeaderProps {
   projects?: Project[];
   onSelectProject?: (project: Project) => void;
   onOpenGuestbook?: () => void;
+  onOpenSyncManager?: () => void;
   isEditMode: boolean;
   setIsEditMode: (mode: boolean) => void;
 }
@@ -35,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   projects = [],
   onSelectProject,
   onOpenGuestbook,
+  onOpenSyncManager,
   isEditMode,
   setIsEditMode
 }) => {
@@ -208,24 +210,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side: Quick Search & Menu Controls */}
         <div className="relative flex items-center gap-2 pointer-events-auto" ref={dropdownRef}>
-          
-          {/* Guestbook Quick Button (Icon-Only) */}
-          {onOpenGuestbook && (
-            <button
-              type="button"
-              onClick={() => {
-                if (dropdownOpen) setDropdownOpen(false);
-                if (isSearchOpen) onOpenSearch();
-                onOpenGuestbook();
-              }}
-              className="h-8 w-8 sm:h-8.5 sm:w-8.5 flex items-center justify-center backdrop-blur-md rounded-full border border-gray-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-900/90 text-black dark:text-white hover:border-gray-400 dark:hover:border-neutral-600 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
-              title={language === 'zh' ? '打开云端在线留言板' : 'View or submit live comments'}
-              id="header-guestbook-pill-btn"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-500 stroke-[1.75]" />
-            </button>
-          )}
-
           {/* Permanent Search Button (Static Position, Never Moves) */}
           <button
             type="button"
@@ -622,6 +606,25 @@ export const Header: React.FC<HeaderProps> = ({
                       </div>
                       <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.2 rounded">
                         ONLINE
+                      </span>
+                    </button>
+                  )}
+
+                  {onOpenSyncManager && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenSyncManager();
+                        setDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-sans rounded-xl text-gray-700 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 stroke-[1.5]" />
+                        <span className="font-medium text-black dark:text-white">{language === 'zh' ? '数据同步/国内加速' : 'Data Sync & China Speed'}</span>
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.2 rounded">
+                        SPEED
                       </span>
                     </button>
                   )}
